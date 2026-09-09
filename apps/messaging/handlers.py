@@ -2,6 +2,7 @@ from asgiref.sync import async_to_sync
 from django.db import transaction
 
 from apps.cases.models import Case
+from apps.cases.presentation import case_status_description, case_status_label
 from apps.cases.services import CaseTransitionError, create_case, finish_input, transition_case
 from apps.evidence.services import sync_message_evidence
 from apps.intelligence.catalog import ensure_fire_loss_schema
@@ -60,7 +61,6 @@ def _record_message(*, inbound: InboundUpdate, user, state: ConversationState, m
     active_case = state.active_case
     can_assign = active_case is not None and active_case.status in {Case.Status.DRAFT, Case.Status.OPEN}
     external_message_id = message.external_message_id or f"update-{inbound.external_update_id}"
-
     case_message, _ = CaseMessage.objects.get_or_create(
         provider=message.provider,
         external_chat_id=message.external_chat_id,
@@ -104,7 +104,7 @@ def _handle_follow_up_answer(*, state, inbound, provider, user, message) -> bool
         send_text(
             provider,
             message.external_chat_id,
-            "برای پاسخ به سؤال تکمیلی فعلاً پاسخ را به‌صورت متن ارسال کنید.",
+            "✍️ برای پاسخ به سؤال تکمیلی، لطفاً پاسخ را فعلاً به‌صورت متن ارسال کنید.",
         )
         return True
 
@@ -116,7 +116,7 @@ def _handle_follow_up_answer(*, state, inbound, provider, user, message) -> bool
     )
     case = question.case
     if next_pending_question(case) is not None:
-        send_text(provider, message.external_chat_id, "پاسخ ثبت شد. سؤال بعدی:")
+        send_text(provider, message.external_chat_id, "✅ پاسخ ثبت شد. سؤال بعدی را می‌فرستم.")
         transaction.on_commit(lambda: send_next_follow_up(case))
         return True
 
@@ -129,7 +129,7 @@ def _handle_follow_up_answer(*, state, inbound, provider, user, message) -> bool
     send_text(
         provider,
         message.external_chat_id,
-        "همه پاسخ‌های تکمیلی ثبت شد. پرونده دوباره با اطلاعات جدید تحلیل می‌شود.",
+        "✅ همه پاسخ‌های تکمیلی ثبت شد.\n\n🔵 نویسه پرونده را دوباره با اطلاعات جدید تحلیل می‌کند.",
     )
     return True
 
@@ -148,16 +148,16 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         send_text(
             provider,
             message.external_chat_id,
-            "سلام، به نویسه خوش آمدید.\n\n"
-            "نویسه اطلاعات پرونده را از متن، صوت و فایل جمع‌آوری می‌کند و در ادامه "
-            "آن‌ها را به گزارش تخصصی تبدیل خواهد کرد.",
+            "👋 سلام، به نویسه خوش آمدید.\n\n"
+            "نویسه اطلاعات پرونده را از متن، صوت، تصویر و مدارک شما جمع‌آوری می‌کند و در پایان یک گزارش تخصصی برای بررسی و تأیید آماده می‌کند.\n\n"
+            "برای شروع، «➕ پرونده جدید» را انتخاب کنید.",
             main_menu_keyboard(),
         )
         return
 
     if normalized_text in STATUS_COMMANDS:
         if state.active_case is None:
-            send_text(provider, message.external_chat_id, "در حال حاضر پرونده فعالی ندارید.")
+            send_text(provider, message.external_chat_id, "📭 در حال حاضر پرونده فعالی ندارید.")
             return
         case = state.active_case
         messages = case.messages.count()
@@ -168,42 +168,54 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         report_revision = None
         if hasattr(case, "report") and case.report.current_revision_id:
             report_revision = case.report.current_revision.revision_number
+        report_text = f"نسخه {report_revision}" if report_revision else "هنوز تولید نشده"
         send_text(
             provider,
             message.external_chat_id,
-            f"پرونده فعال:\n{case.title or 'بدون عنوان'}\n\n"
-            f"پیام‌های ثبت‌شده: {messages}\nصوت: {voices}\nتصویر: {images}\n"
-            f"مدرک: {documents}\nابهام/کمبود باز: {open_issues}\n"
-            f"نسخه گزارش: {report_revision or '-'}\nوضعیت: {case.status}",
+            "📁 وضعیت پرونده فعال\n"
+            "━━━━━━━━━━━━━━\n"
+            f"📝 عنوان: {case.title or 'بدون عنوان'}\n"
+            f"🔖 کد پرونده: {case.case_code}\n\n"
+            f"💬 پیام‌های ثبت‌شده: {messages}\n"
+            f"🎙 پیام صوتی: {voices}\n"
+            f"🖼 تصویر: {images}\n"
+            f"📎 مدرک: {documents}\n"
+            f"🧩 موارد نیازمند تکمیل: {open_issues}\n"
+            f"📄 گزارش: {report_text}\n\n"
+            f"{case_status_label(case.status)}\n"
+            f"↳ {case_status_description(case.status)}",
         )
         return
 
     if normalized_text in APPROVE_COMMANDS:
         if state.active_case is None or state.active_case.status != Case.Status.READY_FOR_REVIEW:
-            send_text(provider, message.external_chat_id, "گزارش آماده‌ای برای تأیید در پرونده فعال وجود ندارد.")
+            send_text(provider, message.external_chat_id, "ℹ️ گزارش آماده‌ای برای تأیید در پرونده فعال وجود ندارد.")
             return
         try:
             approve_report(case=state.active_case, user=user)
         except (ValueError, AttributeError):
-            send_text(provider, message.external_chat_id, "نسخه گزارش آماده تأیید پیدا نشد.")
+            send_text(provider, message.external_chat_id, "⚠️ نسخه گزارش آماده تأیید پیدا نشد.")
             return
         state.active_case.refresh_from_db()
         send_text(
             provider,
             message.external_chat_id,
-            f"گزارش پرونده {state.active_case.case_code} تأیید شد. وضعیت پرونده: approved",
+            f"✅ گزارش پرونده «{state.active_case.title or state.active_case.case_code}» با موفقیت تأیید شد.\n"
+            f"وضعیت: {case_status_label(state.active_case.status)}",
         )
         return
 
     if normalized_text in ACTIVE_COMMANDS:
         if state.active_case is None:
-            send_text(provider, message.external_chat_id, "در حال حاضر پرونده فعالی ندارید.")
+            send_text(provider, message.external_chat_id, "📭 در حال حاضر پرونده فعالی ندارید.")
         else:
             send_text(
                 provider,
                 message.external_chat_id,
-                f"پرونده فعال:\n{state.active_case.title or 'بدون عنوان'}\n"
-                f"کد: {state.active_case.case_code}\nوضعیت: {state.active_case.status}",
+                "📁 پرونده فعال\n"
+                f"📝 {state.active_case.title or 'بدون عنوان'}\n"
+                f"🔖 کد: {state.active_case.case_code}\n"
+                f"{case_status_label(state.active_case.status)}",
             )
         return
 
@@ -225,7 +237,7 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             .first()
         )
         if selected is None:
-            send_text(provider, message.external_chat_id, "پرونده قابل فعال‌سازی با این کد پیدا نشد.")
+            send_text(provider, message.external_chat_id, "⚠️ پرونده قابل فعال‌سازی با این کد پیدا نشد.")
             return
         state.active_case = selected
         state.state = "idle"
@@ -234,7 +246,10 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         send_text(
             provider,
             message.external_chat_id,
-            f"پرونده فعال تغییر کرد:\n{selected.title or 'بدون عنوان'}\nکد: {selected.case_code}",
+            "✅ پرونده فعال تغییر کرد.\n\n"
+            f"📝 {selected.title or 'بدون عنوان'}\n"
+            f"🔖 کد: {selected.case_code}\n"
+            f"{case_status_label(selected.status)}",
         )
         if selected.status == Case.Status.NEEDS_INFORMATION:
             transaction.on_commit(lambda: send_next_follow_up(selected))
@@ -257,14 +272,16 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             .order_by("-updated_at")[:10]
         )
         if not cases:
-            send_text(provider, message.external_chat_id, "پرونده بازی ندارید.")
+            send_text(provider, message.external_chat_id, "📭 پرونده بازی ندارید.")
             return
-        lines = ["پرونده‌های باز شما:"]
+        lines = ["📂 پرونده‌های باز شما", "━━━━━━━━━━━━━━"]
         for item in cases:
-            marker = " ← فعال" if state.active_case_id == item.id else ""
-            lines.append(f"• {item.title or 'بدون عنوان'} — {item.case_code} — {item.status}{marker}")
-        lines.append("\nبرای فعال‌سازی یک پرونده بنویسید: /active CASE_CODE")
-        send_text(provider, message.external_chat_id, "\n".join(lines))
+            marker = "  ← پرونده فعال" if state.active_case_id == item.id else ""
+            lines.append(
+                f"• {item.title or 'بدون عنوان'}\n  🔖 {item.case_code}\n  {case_status_label(item.status)}{marker}"
+            )
+        lines.append("\nبرای انتخاب یک پرونده بنویسید:\n/active CASE_CODE")
+        send_text(provider, message.external_chat_id, "\n\n".join(lines))
         return
 
     if _handle_follow_up_answer(
@@ -286,9 +303,11 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         send_text(
             provider,
             message.external_chat_id,
-            f"پرونده ایجاد شد.\n\nعنوان: {case.title or 'بدون عنوان'}\n"
-            f"کد: {case.case_code}\nوضعیت: باز و فعال\n\n"
-            "از حالا پیام‌ها و فایل‌های عادی شما به این پرونده اضافه می‌شوند.",
+            "✅ پرونده با موفقیت ایجاد شد.\n\n"
+            f"📝 عنوان: {case.title or 'بدون عنوان'}\n"
+            f"🔖 کد پرونده: {case.case_code}\n"
+            f"{case_status_label(case.status)}\n\n"
+            "از حالا متن، صوت، تصویر و مدارکی که می‌فرستید به این پرونده اضافه می‌شوند.",
             main_menu_keyboard(),
         )
         return
@@ -300,18 +319,18 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         send_text(
             provider,
             message.external_chat_id,
-            "یک عنوان کوتاه برای پرونده بفرستید. اگر نمی‌خواهید عنوان وارد کنید، «بدون عنوان» را بفرستید.",
+            "📝 یک عنوان کوتاه برای پرونده بفرستید.\n\nاگر نمی‌خواهید عنوان وارد کنید، «بدون عنوان» را بفرستید.",
         )
         return
 
     if normalized_text in FINISH_COMMANDS:
         if state.active_case is None:
-            send_text(provider, message.external_chat_id, "پرونده فعالی برای پایان ورود اطلاعات وجود ندارد.")
+            send_text(provider, message.external_chat_id, "⚠️ پرونده فعالی برای پایان ورود اطلاعات وجود ندارد.")
             return
         try:
             state.active_case = finish_input(case=state.active_case, actor=user)
         except CaseTransitionError:
-            send_text(provider, message.external_chat_id, "این پرونده در وضعیت فعلی امکان پایان ورود اطلاعات ندارد.")
+            send_text(provider, message.external_chat_id, "⚠️ این پرونده در وضعیت فعلی امکان پایان ورود اطلاعات ندارد.")
             return
         schema = ensure_fire_loss_schema()
         start_extraction(case=state.active_case, schema=schema)
@@ -319,7 +338,7 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         send_text(
             provider,
             message.external_chat_id,
-            "ورود اطلاعات پایان یافت. پرونده وارد مرحله تحلیل ساختاری و بررسی کمبود/تعارض اطلاعات شد.",
+            "🔵 ورود اطلاعات پایان یافت.\n\nنویسه اکنون اطلاعات، صوت‌ها و مدارک پرونده را تحلیل می‌کند و کامل بودن اطلاعات را بررسی خواهد کرد.",
         )
         return
 
@@ -333,16 +352,16 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             send_text(
                 provider,
                 message.external_chat_id,
-                "در حال حاضر پرونده فعالی ندارید. پیام شما موقتاً نگهداری شد.\n\n"
-                "[➕ پرونده جدید] را انتخاب کنید یا یکی از پرونده‌های باز را فعال کنید.",
+                "📭 در حال حاضر پرونده فعالی ندارید. پیام شما موقتاً نگهداری شد.\n\n"
+                "«➕ پرونده جدید» را انتخاب کنید یا یکی از پرونده‌های باز را فعال کنید.",
                 main_menu_keyboard(),
             )
         else:
             send_text(
                 provider,
                 message.external_chat_id,
-                f"پرونده «{state.active_case.title or state.active_case.case_code}» در وضعیت "
-                f"{state.active_case.status} است. این پیام بدون اتصال خودکار به پرونده نگهداری شد.",
+                f"ℹ️ پرونده «{state.active_case.title or state.active_case.case_code}» اکنون در مرحله «{case_status_label(state.active_case.status, with_icon=False)}» است.\n"
+                "این پیام بدون اتصال خودکار به پرونده نگهداری شد.",
             )
         return
 
@@ -350,5 +369,5 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         send_text(
             provider,
             message.external_chat_id,
-            f"فایل به پرونده «{stored.case.title or stored.case.case_code}» اضافه شد و برای پردازش امن در صف قرار گرفت.",
+            f"📎 فایل به پرونده «{stored.case.title or stored.case.case_code}» اضافه شد و برای پردازش امن در صف قرار گرفت.",
         )
