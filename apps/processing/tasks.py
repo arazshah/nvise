@@ -22,6 +22,13 @@ def _next_job_type(message_type: str) -> str | None:
     return None
 
 
+def _enqueue_next_job(job: ProcessingJob) -> None:
+    if job.job_type == ProcessingJob.JobType.TRANSCRIBE_AUDIO:
+        from apps.transcription.tasks import transcribe_audio
+
+        transcribe_audio.delay(str(job.id))
+
+
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def fetch_attachment(self, job_id: str) -> None:
     with transaction.atomic():
@@ -96,9 +103,16 @@ def fetch_attachment(self, job_id: str) -> None:
             attempt.metadata = {"bytes": len(content), "sha256": digest}
             attempt.save(update_fields=["succeeded", "finished_at", "metadata"])
 
+            next_job = None
             next_type = _next_job_type(attachment.message.message_type)
-            if next_type and not attachment.jobs.filter(job_type=next_type).exists():
-                ProcessingJob.objects.create(attachment=attachment, job_type=next_type)
+            if next_type:
+                next_job, _ = ProcessingJob.objects.get_or_create(
+                    attachment=attachment,
+                    job_type=next_type,
+                    defaults={"status": ProcessingJob.Status.PENDING},
+                )
+                if next_job.status == ProcessingJob.Status.PENDING:
+                    transaction.on_commit(lambda next_job=next_job: _enqueue_next_job(next_job))
 
     except BaleFileTooLargeError as exc:
         with transaction.atomic():
