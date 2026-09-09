@@ -1,3 +1,4 @@
+{% load jalali_tags %}
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
@@ -12,14 +13,14 @@
 <body>
 <nav class="nav"><div class="brand">نویسه</div><div class="links"><a href="{% url 'portal:dashboard' %}">داشبورد</a><a href="{% url 'portal:case-list' %}">پرونده‌ها</a><a href="/guide/">راهنما</a><a href="/">صفحه اصلی</a></div></nav>
 <main class="wrap">
-  <section class="hero"><div><h1>💳 اشتراک و مصرف</h1><p>خرید و تمدید پلن‌های نویسه از طریق صورتحساب امن کیف پول بله انجام می‌شود.</p></div><a class="back" href="{% url 'portal:dashboard' %}">بازگشت به داشبورد</a></section>
+  <section class="hero"><div><h1>💳 اشتراک و مصرف</h1><p>پلن فعلی، میزان مصرف و گزینه‌های تمدید یا ارتقای حساب شما.</p></div><a class="back" href="{% url 'portal:dashboard' %}">بازگشت به داشبورد</a></section>
 
   {% for message in messages %}<div class="flash {{ message.tags }}">{{ message }}</div>{% endfor %}
 
   {% if not billing_visible %}
-    <div class="card"><h2>بخش اشتراک فعلاً غیرفعال است</h2><p class="muted">مدیر سامانه نمایش عمومی اطلاعات اشتراک را غیرفعال کرده است. برای اطلاعات بیشتر با پشتیبانی تماس بگیرید.</p></div>
+    <div class="card"><h2>بخش اشتراک فعلاً در دسترس نیست</h2><p class="muted">برای اطلاعات بیشتر با پشتیبانی نویسه تماس بگیرید.</p></div>
   {% else %}
-    {% if trial_expired %}<div class="notice expired"><strong>⏳ دوره آزمایشی ۳۰ روزه شما به پایان رسیده است.</strong><br>پرونده‌ها، مدارک و گزارش‌های قبلی شما حذف نشده‌اند و همچنان قابل مشاهده‌اند. فقط عملیات هزینه‌دار مانند تبدیل صوت به متن و تحلیل هوشمند تا فعال‌کردن یک پلن پولی متوقف شده‌اند. یکی از پلن‌های حرفه‌ای یا تیمی را از پایین همین صفحه انتخاب کنید.</div>{% endif %}
+    {% if trial_expired %}<div class="notice expired"><strong>⏳ دوره آزمایشی ۳۰ روزه شما به پایان رسیده است.</strong><br>پرونده‌ها، مدارک و گزارش‌های قبلی شما حذف نشده‌اند و همچنان قابل مشاهده‌اند. برای ادامه تبدیل صوت و تحلیل هوشمند، یکی از پلن‌های حرفه‌ای یا تیمی را انتخاب کنید.</div>{% endif %}
 
     <div class="grid">
       <section class="card">
@@ -27,15 +28,14 @@
         {% if subscription and plan %}
           <div class="plan-name">{{ plan.name }}</div><span class="status">{{ subscription_status_label }}</span>
           {% if is_trial %}<div class="notice disabled">🎁 این دوره آزمایشی فقط یک‌بار برای هر حساب و به مدت ۳۰ روز ارائه می‌شود.</div>{% endif %}
-          <div class="facts"><div class="fact"><strong>{{ plan.monthly_price|floatformat:0 }}</strong><span>{{ plan.currency }} در ماه</span></div><div class="fact"><strong>{{ tenant.name }}</strong><span>حساب / فضای کاری</span></div><div class="fact"><strong>{{ period_start|date:'Y/m/d' }}</strong><span>شروع دوره</span></div><div class="fact"><strong>{{ period_end|date:'Y/m/d' }}</strong><span>پایان اعتبار</span></div></div>
+          <div class="facts"><div class="fact"><strong>{{ plan.monthly_price|floatformat:0 }}</strong><span>{{ plan.currency }} در ماه</span></div><div class="fact"><strong>{{ tenant.name }}</strong><span>حساب / فضای کاری</span></div><div class="fact"><strong>{{ period_start|jalali_date }}</strong><span>شروع دوره</span></div><div class="fact"><strong>{{ period_end|jalali_date }}</strong><span>پایان اعتبار</span></div></div>
         {% else %}
-          <div class="plan-name">بدون پلن فعال</div><p class="muted">برای این حساب اشتراک فعالی پیدا نشد. یک پلن پولی را از پایین صفحه انتخاب کنید.</p>
+          <div class="plan-name">بدون پلن فعال</div><p class="muted">برای این حساب اشتراک فعالی پیدا نشد. یکی از پلن‌های پایین صفحه را انتخاب کنید.</p>
         {% endif %}
       </section>
       <section class="card">
         <h2>پرداخت از طریق بله</h2>
-        <p class="muted">ارائه‌دهنده: <strong>{{ payment_provider_label }}</strong></p>
-        {% if can_pay %}<div class="notice ready">✅ پرداخت آماده است. پس از انتخاب پلن، صورتحساب به گفتگوی بله شما ارسال می‌شود. اشتراک فقط پس از تأیید نهایی پرداخت بله فعال یا تمدید می‌شود.</div>{% elif online_payment_enabled and not payment_token_configured %}<div class="notice">⚠️ توکن پرداخت کیف پول بله هنوز در Admin تنظیم نشده است.</div>{% elif online_payment_enabled and not has_bale_identity %}<div class="notice">⚠️ ابتدا حساب خود را از طریق ربات نویسه در بله متصل کنید.</div>{% elif not can_manage_billing %}<div class="notice">⚠️ فقط مالک یا مدیر حساب امکان خرید یا تمدید پلن را دارد.</div>{% else %}<div class="notice disabled">💡 {{ billing_notice }}</div>{% endif %}
+        {% if can_pay %}<div class="notice ready">✅ پرداخت آماده است. پس از انتخاب پلن، صورتحساب به گفتگوی بله شما ارسال می‌شود و پس از پرداخت، اشتراک به‌صورت خودکار فعال یا تمدید خواهد شد.</div>{% elif online_payment_enabled and not has_bale_identity %}<div class="notice">⚠️ برای پرداخت، ابتدا ربات نویسه را در بله باز کنید و حساب خود را متصل کنید.</div>{% elif not can_manage_billing %}<div class="notice">⚠️ فقط مالک یا مدیر حساب امکان خرید یا تمدید پلن را دارد.</div>{% else %}<div class="notice disabled">💡 پرداخت آنلاین فعلاً در دسترس نیست. برای راهنمایی با پشتیبانی تماس بگیرید.</div>{% endif %}
       </section>
     </div>
 
@@ -47,10 +47,10 @@
       <div class="meter"><div class="n">{{ usage_docs|floatformat:0 }}</div><div class="l">سند تولیدشده</div></div>
     </section>
 
-    <h2 style="margin:30px 0 10px">پلن‌های فعال سامانه</h2>
-    {% if plans %}<section class="plans">{% for item in plans %}<article class="plan"><h3>{{ item.name }}</h3><div class="price">{{ item.monthly_price|floatformat:0 }} <small>{{ item.currency }} / ماه</small></div><ul><li>{{ item.max_cases_per_period }} پرونده در دوره</li><li>{{ item.max_stt_seconds_per_period }} ثانیه STT</li><li>{{ item.max_ai_extractions_per_period }} تحلیل هوشمند</li><li>{{ item.max_members }} عضو</li></ul>{% if item.code == 'trial' %}<button class="buy" type="button" disabled>{% if is_trial %}دوره آزمایشی فعلی{% else %}آزمایشی یک‌باره ۳۰ روزه{% endif %}</button>{% elif item.monthly_price > 0 %}<form method="post" action="{% url 'portal:billing-checkout' item.code %}">{% csrf_token %}<button class="buy" type="submit" {% if not can_pay %}disabled{% endif %}>{% if plan and plan.id == item.id %}تمدید این پلن در بله{% else %}خرید این پلن در بله{% endif %}</button></form>{% else %}<button class="buy" type="button" disabled>بدون پرداخت</button>{% endif %}</article>{% endfor %}</section>{% else %}<div class="card muted">پلن فعالی در Admin تعریف نشده است.</div>{% endif %}
+    <h2 style="margin:30px 0 10px">پلن‌های نویسه</h2>
+    {% if plans %}<section class="plans">{% for item in plans %}<article class="plan"><h3>{{ item.name }}</h3><div class="price">{{ item.monthly_price|floatformat:0 }} <small>{{ item.currency }} / ماه</small></div><ul><li>{{ item.max_cases_per_period }} پرونده در دوره</li><li>{{ item.max_stt_seconds_per_period }} ثانیه تبدیل صوت</li><li>{{ item.max_ai_extractions_per_period }} تحلیل هوشمند</li><li>{{ item.max_members }} عضو</li></ul>{% if item.code == 'trial' %}<button class="buy" type="button" disabled>{% if is_trial %}دوره آزمایشی فعلی{% else %}آزمایشی یک‌باره ۳۰ روزه{% endif %}</button>{% elif item.monthly_price > 0 %}<form method="post" action="{% url 'portal:billing-checkout' item.code %}">{% csrf_token %}<button class="buy" type="submit" {% if not can_pay %}disabled{% endif %}>{% if plan and plan.id == item.id %}تمدید این پلن در بله{% else %}خرید این پلن در بله{% endif %}</button></form>{% else %}<button class="buy" type="button" disabled>بدون پرداخت</button>{% endif %}</article>{% endfor %}</section>{% else %}<div class="card muted">در حال حاضر پلنی برای نمایش وجود ندارد.</div>{% endif %}
 
-    {% if recent_payments %}<h2 style="margin:30px 0 10px">آخرین پرداخت‌ها</h2><table class="payments"><thead><tr><th>پلن</th><th>مبلغ</th><th>وضعیت</th><th>زمان</th></tr></thead><tbody>{% for payment in recent_payments %}<tr><td>{{ payment.plan.name }}</td><td>{{ payment.amount }} ریال</td><td>{{ payment.get_status_display }}</td><td>{{ payment.created_at|date:'Y/m/d H:i' }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+    {% if recent_payments %}<h2 style="margin:30px 0 10px">آخرین پرداخت‌ها</h2><table class="payments"><thead><tr><th>پلن</th><th>مبلغ</th><th>وضعیت</th><th>زمان</th></tr></thead><tbody>{% for payment in recent_payments %}<tr><td>{{ payment.plan.name }}</td><td>{{ payment.amount }} ریال</td><td>{{ payment.get_status_display }}</td><td>{{ payment.created_at|jalali_datetime }}</td></tr>{% endfor %}</tbody></table>{% endif %}
   {% endif %}
 
   <div class="support">برای پرسش درباره پلن یا پشتیبانی: <a href="mailto:{{ support_email }}">{{ support_email }}</a></div>
