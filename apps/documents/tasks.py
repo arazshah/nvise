@@ -7,6 +7,8 @@ from django.utils import timezone
 from apps.messaging.models import ConversationState
 from apps.messaging.providers.bale import BaleProvider
 from apps.processing.storage import read_private_bytes, store_private_bytes
+from apps.subscriptions.models import UsageRecord
+from apps.subscriptions.services import record_usage
 
 from .models import GeneratedDocument
 from .renderer import render_revision_docx
@@ -14,10 +16,7 @@ from .renderer import render_revision_docx
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def deliver_docx_to_bale(self, document_id: str) -> None:
-    document = (
-        GeneratedDocument.objects.select_related("revision__report__case")
-        .get(pk=document_id)
-    )
+    document = GeneratedDocument.objects.select_related("revision__report__case").get(pk=document_id)
     if document.status != GeneratedDocument.Status.READY or not document.storage_key:
         return
     case = document.revision.report.case
@@ -43,7 +42,7 @@ def render_docx(self, document_id: str) -> None:
     with transaction.atomic():
         document = (
             GeneratedDocument.objects.select_for_update()
-            .select_related("revision__report__case")
+            .select_related("revision__report__case__tenant")
             .get(pk=document_id)
         )
         if document.status == GeneratedDocument.Status.READY:
@@ -79,6 +78,14 @@ def render_docx(self, document_id: str) -> None:
                     "completed_at",
                     "updated_at",
                 ]
+            )
+            record_usage(
+                tenant=case.tenant,
+                metric=UsageRecord.Metric.DOCUMENT_GENERATED,
+                quantity=1,
+                idempotency_key=f"document:{document.id}:generated",
+                case=case,
+                metadata={"revision": document.revision.revision_number, "kind": document.kind},
             )
             transaction.on_commit(lambda: deliver_docx_to_bale.delay(str(document.id)))
     except Exception as exc:
