@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nvise SaaS Admin</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#f6f7fb;color:#172033;margin:0;padding:32px}
+    .wrap{max-width:1200px;margin:auto}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:20px;box-shadow:0 6px 18px rgba(0,0,0,.04)}
+    h1{margin-top:0} .value{font-size:28px;font-weight:800;margin-top:8px}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:16px;overflow:hidden;margin-top:24px}
+    th,td{padding:12px;border-bottom:1px solid #eee;text-align:right}th{background:#f1f5f9}
+    .muted{color:#64748b}.section{margin-top:28px}.pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#eef2ff}
+    @media(max-width:800px){.grid{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>داشبورد SaaS نویسه</h1>
+  <p class="muted">نمای مدیریتی tenantها، subscriptionها و مصرف ۳۰ روز اخیر.</p>
+  <div class="grid">
+    <div class="card"><div>Tenantها</div><div class="value">{{ tenant_count }}</div></div>
+    <div class="card"><div>Subscription فعال</div><div class="value">{{ active_subscription_count }}</div></div>
+    <div class="card"><div>MRR</div><div class="value">{{ mrr }}</div></div>
+    <div class="card"><div>از تاریخ</div><div class="value" style="font-size:18px">{{ since|date:"Y-m-d" }}</div></div>
+  </div>
+
+  <div class="section grid">
+    <div class="card"><div>Case ساخته‌شده</div><div class="value">{{ usage.case_created|default:"0" }}</div></div>
+    <div class="card"><div>STT seconds</div><div class="value">{{ usage.stt_seconds|default:"0" }}</div></div>
+    <div class="card"><div>AI extraction</div><div class="value">{{ usage.ai_extraction|default:"0" }}</div></div>
+    <div class="card"><div>Document</div><div class="value">{{ usage.document_generated|default:"0" }}</div></div>
+  </div>
+
+  <h2 class="section">وضعیت اشتراک‌ها</h2>
+  <div class="card">
+    {% for row in subscription_status %}<span class="pill">{{ row.status }}: {{ row.total }}</span> {% empty %}بدون اشتراک{% endfor %}
+  </div>
+
+  <h2 class="section">Tenantها</h2>
+  <table>
+    <thead><tr><th>نام</th><th>Slug</th><th>اعضا</th><th>Plan</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for tenant in tenant_rows %}
+      <tr>
+        <td>{{ tenant.name }}</td><td>{{ tenant.slug }}</td><td>{{ tenant.active_members }}</td>
+        <td>{% if tenant.subscription %}{{ tenant.subscription.plan.code }}{% else %}-{% endif %}</td>
+        <td>{% if tenant.subscription %}{{ tenant.subscription.status }}{% else %}-{% endif %}</td>
+      </tr>
+    {% empty %}<tr><td colspan="5">Tenant ثبت نشده است.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+</body>
+</html>
