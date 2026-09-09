@@ -1,3 +1,4 @@
+from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +11,6 @@ from apps.messaging.tasks import (
     _show_billing_summary,
 )
 from apps.subscriptions.models import Plan, Subscription
-from apps.system.models import IntegrationSettings
 from apps.tenants.models import Tenant, TenantMembership
 
 
@@ -69,7 +69,7 @@ def _account():
         plan=trial,
         status=Subscription.Status.TRIALING,
         current_period_start=now,
-        current_period_end=now + timezone.timedelta(days=30),
+        current_period_end=now + timedelta(days=30),
         metadata={"trial_granted": True},
     )
     return user, tenant, pro, team
