@@ -41,6 +41,44 @@ class BaleClient:
         result = await self.call("sendMessage", payload)
         return result or {}
 
+    async def send_invoice(
+        self,
+        *,
+        chat_id: str,
+        title: str,
+        description: str,
+        payload: str,
+        provider_token: str,
+        prices: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        result = await self.call(
+            "sendInvoice",
+            {
+                "chat_id": chat_id,
+                "title": title,
+                "description": description,
+                "payload": payload,
+                "provider_token": provider_token,
+                "prices": prices,
+            },
+        )
+        return result or {}
+
+    async def answer_pre_checkout_query(
+        self,
+        *,
+        pre_checkout_query_id: str,
+        ok: bool,
+        error_message: str | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "pre_checkout_query_id": pre_checkout_query_id,
+            "ok": ok,
+        }
+        if not ok and error_message:
+            payload["error_message"] = error_message
+        await self.call("answerPreCheckoutQuery", payload)
+
     async def send_document(
         self,
         chat_id: str,
