@@ -1,3 +1,4 @@
+{% load analysis_tags %}
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
@@ -6,7 +7,7 @@
   <title>{{ case.title|default:case.case_code }} | نویسه</title>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
   <style>
-    *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif}.wrap{max-width:1180px;margin:0 auto;padding:26px 18px}.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.head h1{margin:0 0 6px;font-size:28px}.muted{color:#667085}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:10px;padding:10px 14px;background:#172033;color:#fff;text-decoration:none;cursor:pointer;font-family:inherit}.btn.secondary{background:#eef2ff;color:#1e293b}.btn.warn{background:#92400e}.btn.success{background:#166534}.summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:22px 0}.stat{background:#fff;border:1px solid #e8ecf4;border-radius:16px;padding:15px}.stat b{display:block;font-size:22px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.tab{padding:9px 12px;border-radius:999px;text-decoration:none;background:#fff;color:#334155;border:1px solid #e1e6ef}.tab.active{background:#172033;color:#fff}.card{background:#fff;border:1px solid #e8ecf4;border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 8px 26px rgba(21,36,72,.04)}.row{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.kind{font-weight:800}.meta{font-size:12px;color:#667085;margin-top:5px}.text{white-space:pre-wrap;line-height:1.9;margin-top:12px}.transcript{margin-top:12px;background:#f8fafc;border-right:3px solid #6366f1;padding:12px;border-radius:10px}.file{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.file a{font-size:13px;text-decoration:none;color:#1d4ed8}.badge{padding:5px 9px;border-radius:999px;background:#eef2ff;font-size:12px}.archive{background:#fff7ed;border:1px solid #fed7aa;border-radius:15px;padding:14px;margin:16px 0}.empty{background:#fff;border:1px dashed #cbd5e1;border-radius:16px;padding:28px;color:#667085;text-align:center}@media(max-width:850px){.summary{grid-template-columns:repeat(2,1fr)}.top,.row{flex-direction:column}.actions{width:100%}}@media(max-width:520px){.summary{grid-template-columns:1fr 1fr}}
+    *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif}.wrap{max-width:1180px;margin:0 auto;padding:26px 18px}.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.head h1{margin:0 0 6px;font-size:28px}.muted{color:#667085}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:10px;padding:10px 14px;background:#172033;color:#fff;text-decoration:none;cursor:pointer;font-family:inherit}.btn.secondary{background:#eef2ff;color:#1e293b}.btn.warn{background:#92400e}.btn.success{background:#166534}.summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:22px 0}.stat{background:#fff;border:1px solid #e8ecf4;border-radius:16px;padding:15px}.stat b{display:block;font-size:22px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.tab{padding:9px 12px;border-radius:999px;text-decoration:none;background:#fff;color:#334155;border:1px solid #e1e6ef}.tab.active{background:#172033;color:#fff}.card{background:#fff;border:1px solid #e8ecf4;border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 8px 26px rgba(21,36,72,.04)}.row{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.kind{font-weight:800}.meta{font-size:12px;color:#667085;margin-top:5px}.text{white-space:pre-wrap;line-height:1.9;margin-top:12px}.transcript{margin-top:12px;background:#f8fafc;border-right:3px solid #6366f1;padding:12px;border-radius:10px}.file{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.file a{font-size:13px;text-decoration:none;color:#1d4ed8}.badge{padding:5px 9px;border-radius:999px;background:#eef2ff;font-size:12px}.archive{background:#fff7ed;border:1px solid #fed7aa;border-radius:15px;padding:14px;margin:16px 0}.analysis{background:linear-gradient(135deg,#111827,#312e81);color:#fff;border-radius:22px;padding:22px;margin:22px 0;box-shadow:0 18px 44px rgba(49,46,129,.18)}.analysis h2{margin:0 0 8px;font-size:22px}.analysis .lead{color:#dbeafe;line-height:1.9}.analysis-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:16px}.analysis-stat{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.13);border-radius:14px;padding:14px}.analysis-stat span{display:block;color:#cbd5e1;font-size:12px}.analysis-stat b{display:block;font-size:24px;margin-top:4px}.analysis-note{margin-top:14px;padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.08);line-height:1.9}.empty{background:#fff;border:1px dashed #cbd5e1;border-radius:16px;padding:28px;color:#667085;text-align:center}@media(max-width:850px){.summary{grid-template-columns:repeat(2,1fr)}.analysis-grid{grid-template-columns:repeat(2,1fr)}.top,.row{flex-direction:column}.actions{width:100%}}@media(max-width:520px){.summary{grid-template-columns:1fr 1fr}.analysis-grid{grid-template-columns:1fr 1fr}}
   </style>
 </head>
 <body>
@@ -14,6 +15,7 @@
   <div class="top">
     <div class="head"><div class="muted">📁 مخزن پرونده</div><h1>{{ case.title|default:'بدون عنوان' }}</h1><div class="muted">{{ case.case_code }}</div></div>
     <div class="actions">
+      <a class="btn secondary" href="{% url 'portal:dashboard' %}">داشبورد</a>
       <a class="btn secondary" href="{% url 'portal:case-list' %}">همه پرونده‌ها</a>
       {% if report and report.current_revision_id %}<a class="btn" href="{% url 'portal:case-review' case.case_code %}">مشاهده گزارش</a>{% endif %}
       {% if case.lifecycle_status == 'active' %}
@@ -25,6 +27,27 @@
   </div>
 
   {% if case.lifecycle_status == 'archived' %}<div class="archive">📦 این پرونده بایگانی شده است. همه محتوا و مدارک آن محفوظ مانده و در هر زمان می‌توانید آن را بازگشایی کنید.</div>{% endif %}
+
+  {% if case.analysis_status == 'completed' or case.analysis_status == 'needs_review' %}
+    {% analysis_summary case as analysis %}
+    <section class="analysis">
+      <h2>🧠 نتیجه آخرین تحلیل</h2>
+      <div class="lead">قبل از رفع ابهام‌ها یا تولید گزارش، خلاصه نتیجه تحلیل را بررسی کنید.</div>
+      <div class="analysis-grid">
+        <div class="analysis-stat"><span>اطلاعات قابل استفاده</span><b>{{ analysis.usable_facts }}</b></div>
+        <div class="analysis-stat"><span>موارد متناقض</span><b>{{ analysis.conflicts }}</b></div>
+        <div class="analysis-stat"><span>موارد نامعتبر</span><b>{{ analysis.invalid }}</b></div>
+        <div class="analysis-stat"><span>موارد پیدا نشده</span><b>{{ analysis.missing }}</b></div>
+      </div>
+      <div class="analysis-note">
+        {% if analysis.has_issues %}
+          ⚠️ در مجموع {{ analysis.open_issues }} مورد نیازمند تصمیم شماست. از داخل بله می‌توانید «رفع موارد»، «افزودن مدرک بیشتر» یا «ادامه با اطلاعات فعلی» را انتخاب کنید.
+        {% else %}
+          ✅ مورد حل‌نشده‌ای باقی نمانده است. در بله می‌توانید «تولید گزارش» را انتخاب کنید یا قبل از آن مدرک بیشتری اضافه کنید.
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
 
   <div class="summary">
     <div class="stat"><span class="muted">همه موارد</span><b>{{ counts.all }}</b></div>
