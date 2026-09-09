@@ -98,8 +98,14 @@ class BaleProvider(MessagingProvider):
     async def send_text(self, chat_id: str, text: str, keyboard: dict | None = None) -> dict:
         return await self._require_client().send_message(chat_id, text, keyboard)
 
-    async def send_document(self, chat_id: str, document: bytes, filename: str) -> dict:
-        raise NotImplementedError("Multipart document upload will be added in document delivery phase")
+    async def send_document(
+        self,
+        chat_id: str,
+        document: bytes,
+        filename: str,
+        caption: str | None = None,
+    ) -> dict:
+        return await self._require_client().send_document(chat_id, document, filename, caption)
 
     async def answer_callback(self, callback_id: str, text: str | None = None) -> None:
         await self._require_client().answer_callback_query(callback_id, text)
