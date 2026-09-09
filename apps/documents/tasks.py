@@ -1,11 +1,41 @@
+from asgiref.sync import async_to_sync
 from celery import shared_task
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.processing.storage import store_private_bytes
+from apps.messaging.models import ConversationState
+from apps.messaging.providers.bale import BaleProvider
+from apps.processing.storage import read_private_bytes, store_private_bytes
 
 from .models import GeneratedDocument
 from .renderer import render_revision_docx
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+def deliver_docx_to_bale(self, document_id: str) -> None:
+    document = (
+        GeneratedDocument.objects.select_related("revision__report__case")
+        .get(pk=document_id)
+    )
+    if document.status != GeneratedDocument.Status.READY or not document.storage_key:
+        return
+    case = document.revision.report.case
+    state = (
+        ConversationState.objects.filter(active_case=case, provider="bale")
+        .order_by("-updated_at")
+        .first()
+    )
+    if state is None or not settings.BALE_BOT_TOKEN:
+        return
+    content = read_private_bytes(document.storage_key)
+    provider = BaleProvider(settings.BALE_BOT_TOKEN)
+    async_to_sync(provider.send_document)(
+        state.external_chat_id,
+        content,
+        document.filename or f"{case.case_code}.docx",
+        "نسخه تأییدشده گزارش پرونده نویسه",
+    )
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
@@ -50,6 +80,7 @@ def render_docx(self, document_id: str) -> None:
                     "updated_at",
                 ]
             )
+            transaction.on_commit(lambda: deliver_docx_to_bale.delay(str(document.id)))
     except Exception as exc:
         with transaction.atomic():
             document = GeneratedDocument.objects.select_for_update().get(pk=document.pk)
