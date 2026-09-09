@@ -11,6 +11,9 @@ ADD_EVIDENCE_LABEL = "📎 افزودن مدرک بیشتر"
 CONTINUE_CURRENT_LABEL = "⏭ ادامه با اطلاعات فعلی"
 GENERATE_REPORT_LABEL = "📄 تولید گزارش"
 VIEW_ANALYSIS_LABEL = "🧠 مشاهده نتیجه تحلیل"
+HOME_MENU_LABEL = "🏠 منوی اصلی"
+NEW_CASE_LABEL = "➕ پرونده جدید"
+MY_CASES_LABEL = "📂 پرونده‌های من"
 
 
 def analysis_result_summary(case: Case) -> dict:
@@ -42,13 +45,16 @@ def analysis_result_keyboard(case: Case) -> dict:
     summary = analysis_result_summary(case)
     rows = []
     if summary["has_issues"]:
-        rows.append([{"text": RESOLVE_ISSUES_LABEL}])
-        rows.append([{"text": ADD_EVIDENCE_LABEL}])
+        rows.append([{"text": RESOLVE_ISSUES_LABEL}, {"text": ADD_EVIDENCE_LABEL}])
         rows.append([{"text": CONTINUE_CURRENT_LABEL}])
     else:
-        rows.append([{"text": GENERATE_REPORT_LABEL}])
-        rows.append([{"text": ADD_EVIDENCE_LABEL}])
-    return {"keyboard": rows, "resize_keyboard": True, "one_time_keyboard": True}
+        rows.append([{"text": GENERATE_REPORT_LABEL}, {"text": ADD_EVIDENCE_LABEL}])
+
+    # Global navigation must always remain visible so analysis never traps the user
+    # inside one case. These actions are handled by the normal messaging workflow.
+    rows.append([{"text": NEW_CASE_LABEL}, {"text": MY_CASES_LABEL}])
+    rows.append([{"text": HOME_MENU_LABEL}])
+    return {"keyboard": rows, "resize_keyboard": True}
 
 
 def analysis_result_text(case: Case) -> str:
@@ -78,6 +84,12 @@ def analysis_result_text(case: Case) -> str:
                 "اگر آماده هستید می‌توانید گزارش را تولید کنید یا مدرک بیشتری به پرونده اضافه کنید.",
             ]
         )
+    lines.extend(
+        [
+            "",
+            "برای کار روی پرونده دیگری یا ساخت پرونده جدید، از دکمه‌های پایین استفاده کنید.",
+        ]
+    )
     return "\n".join(lines)
 
 
