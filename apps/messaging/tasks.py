@@ -1,4 +1,3 @@
-from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -8,27 +7,17 @@ from django.utils import timezone
 from apps.accounts.models import BaleIdentity
 from apps.tenants.models import Tenant, TenantMembership
 
-from .models import ConversationState, InboundUpdate
+from .handlers import handle_message
+from .models import InboundUpdate
 from .providers.bale import BaleProvider
-
-
-WELCOME_TEXT = (
-    "سلام، به نویسه خوش آمدید.\n\n"
-    "نویسه پیام‌های صوتی و متنی شما را به گزارش حرفه‌ای تبدیل می‌کند.\n\n"
-    "نسخه اولیه برای کارشناسان ارزیابی خسارت بیمه طراحی شده است."
-)
 
 
 def _resolve_bale_user(message):
     User = get_user_model()
     username = f"bale_{message.external_user_id}"
+    sender = (message.raw or {}).get("from", {})
     display_name = " ".join(
-        part
-        for part in [
-            (message.raw or {}).get("from", {}).get("first_name"),
-            (message.raw or {}).get("from", {}).get("last_name"),
-        ]
-        if part
+        part for part in [sender.get("first_name"), sender.get("last_name")] if part
     ).strip()
 
     user, _ = User.objects.get_or_create(
@@ -40,9 +29,9 @@ def _resolve_bale_user(message):
         defaults={
             "user": user,
             "external_chat_id": message.external_chat_id,
-            "username": (message.raw or {}).get("from", {}).get("username", ""),
-            "first_name": (message.raw or {}).get("from", {}).get("first_name", ""),
-            "last_name": (message.raw or {}).get("from", {}).get("last_name", ""),
+            "username": sender.get("username", ""),
+            "first_name": sender.get("first_name", ""),
+            "last_name": sender.get("last_name", ""),
         },
     )
 
@@ -82,18 +71,13 @@ def process_bale_update(self, inbound_update_id: str) -> None:
     try:
         with transaction.atomic():
             user = _resolve_bale_user(normalized.message)
-            ConversationState.objects.get_or_create(
-                user=user,
-                provider="bale",
-                external_chat_id=normalized.message.external_chat_id,
-            )
 
-        if (normalized.message.text or "").strip().lower() == "/start":
-            if settings.BALE_BOT_TOKEN:
-                async_to_sync(provider.send_text)(
-                    normalized.message.external_chat_id,
-                    WELCOME_TEXT,
-                )
+        handle_message(
+            inbound=inbound,
+            provider=provider,
+            user=user,
+            message=normalized.message,
+        )
 
         inbound.processed_at = timezone.now()
         inbound.processing_error = ""
