@@ -6,7 +6,9 @@ from apps.cases.models import Case
 from apps.cases.services import transition_case
 from apps.messaging.models import CaseMessage
 from apps.processing.models import ProcessingJob
+from apps.reports.services import generate_report_revision
 
+from .followups import ensure_follow_up_questions, send_next_follow_up
 from .models import CaseFieldIssue, ExtractionRun, FieldSchema
 from .providers import get_extraction_provider
 from .services import apply_extraction_response, collect_case_evidence, serialize_schema
@@ -70,7 +72,13 @@ def extract_case_facts(self, run_id: str) -> None:
         target = Case.Status.NEEDS_INFORMATION if has_open_issues else Case.Status.READY_FOR_REVIEW
         refreshed_case = Case.objects.get(pk=run.case_id)
         if refreshed_case.status == Case.Status.FINALIZING:
-            transition_case(case=refreshed_case, target_status=target)
+            refreshed_case = transition_case(case=refreshed_case, target_status=target)
+
+        if has_open_issues:
+            ensure_follow_up_questions(refreshed_case)
+            send_next_follow_up(refreshed_case)
+        elif refreshed_case.status == Case.Status.READY_FOR_REVIEW:
+            generate_report_revision(case=refreshed_case, created_by=refreshed_case.created_by)
     except Exception as exc:
         with transaction.atomic():
             run = ExtractionRun.objects.select_for_update().get(pk=run.pk)
