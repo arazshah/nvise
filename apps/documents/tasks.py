@@ -1,6 +1,5 @@
 from asgiref.sync import async_to_sync
 from celery import shared_task
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -9,6 +8,7 @@ from apps.messaging.providers.bale import BaleProvider
 from apps.processing.storage import read_private_bytes, store_private_bytes
 from apps.subscriptions.models import UsageRecord
 from apps.subscriptions.services import record_usage
+from apps.system.integrations import get_bale_config
 
 from .models import GeneratedDocument
 from .renderer import render_revision_docx
@@ -25,10 +25,11 @@ def deliver_docx_to_bale(self, document_id: str) -> None:
         .order_by("-updated_at")
         .first()
     )
-    if state is None or not settings.BALE_BOT_TOKEN:
+    config = get_bale_config()
+    if state is None or not config.enabled or not config.bot_token:
         return
     content = read_private_bytes(document.storage_key)
-    provider = BaleProvider(settings.BALE_BOT_TOKEN)
+    provider = BaleProvider(config.bot_token)
     async_to_sync(provider.send_document)(
         state.external_chat_id,
         content,
