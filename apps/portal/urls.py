@@ -10,6 +10,7 @@ urlpatterns = [
     path("access/<str:token>/", views.review_access, name="access"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("billing/", billing_views.billing_overview, name="billing"),
+    path("billing/checkout/<slug:plan_code>/", billing_views.start_bale_checkout, name="billing-checkout"),
     path("cases/", views.case_list, name="case-list"),
     path("cases/<str:case_code>/", views.case_repository, name="case-repository"),
     path("cases/<str:case_code>/analysis/", analysis_views.analysis_overview, name="analysis-overview"),
