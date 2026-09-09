@@ -3,22 +3,33 @@ from celery import shared_task
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Sum
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import BaleIdentity
 from apps.intelligence.actions import handle_analysis_action
 from apps.portal.services import create_portal_access_token
+from apps.subscriptions.models import UsageRecord
 from apps.subscriptions.payments import PaymentError, process_successful_payment
 from apps.subscriptions.services import QuotaExceededError
 from apps.system.integrations import get_bale_config
 from apps.tenants.models import Tenant, TenantMembership
 from apps.tenants.services import MemberLimitExceededError, add_tenant_member
 
-from .handlers import handle_message
+from .handlers import handle_message, main_menu_keyboard
 from .models import InboundUpdate
 from .providers.bale import BaleProvider
-from .providers.bale.provider import PORTAL_LOGIN_LABEL
+from .providers.bale.provider import BILLING_LABEL, PORTAL_LOGIN_LABEL
+
+
+SUBSCRIPTION_STATUS_LABELS = {
+    "trialing": "دوره آزمایشی",
+    "active": "فعال",
+    "past_due": "نیازمند پیگیری پرداخت",
+    "cancelled": "لغو شده",
+    "expired": "منقضی شده",
+}
 
 
 def _resolve_bale_user(message):
@@ -92,6 +103,70 @@ def _send_portal_access_link(*, provider, user, message) -> None:
     )
 
 
+def _show_billing_summary(*, provider, user, message) -> None:
+    membership = (
+        user.tenant_memberships.select_related("tenant", "tenant__subscription__plan")
+        .filter(is_active=True, tenant__is_active=True)
+        .order_by("created_at")
+        .first()
+    )
+    if membership is None:
+        async_to_sync(provider.send_text)(
+            message.external_chat_id,
+            "⚠️ حساب فعالی برای نمایش اشتراک پیدا نشد.",
+            main_menu_keyboard(),
+        )
+        return
+
+    tenant = membership.tenant
+    subscription = getattr(tenant, "subscription", None)
+    if subscription is None:
+        text = (
+            "💳 اشتراک و مصرف\n"
+            "━━━━━━━━━━━━━━\n"
+            f"🏢 حساب: {tenant.name}\n"
+            "📦 پلن فعال: ندارید\n\n"
+            "برای مشاهده پلن‌ها و خرید اشتراک، از «🌐 ورود به پنل نویسه» استفاده کنید."
+        )
+        async_to_sync(provider.send_text)(message.external_chat_id, text, main_menu_keyboard())
+        return
+
+    plan = subscription.plan
+    usage = {
+        row["metric"]: row["total"]
+        for row in UsageRecord.objects.filter(
+            tenant=tenant,
+            occurred_at__gte=subscription.current_period_start,
+            occurred_at__lt=subscription.current_period_end,
+        )
+        .values("metric")
+        .annotate(total=Sum("quantity"))
+    }
+
+    cases = usage.get(UsageRecord.Metric.CASE_CREATED, 0)
+    stt = usage.get(UsageRecord.Metric.STT_SECONDS, 0)
+    ai = usage.get(UsageRecord.Metric.AI_EXTRACTION, 0)
+    docs = usage.get(UsageRecord.Metric.DOCUMENT_GENERATED, 0)
+    status = SUBSCRIPTION_STATUS_LABELS.get(subscription.status, subscription.status)
+
+    text = (
+        "💳 اشتراک و مصرف\n"
+        "━━━━━━━━━━━━━━\n"
+        f"🏢 حساب: {tenant.name}\n"
+        f"📦 پلن: {plan.name}\n"
+        f"✅ وضعیت: {status}\n"
+        f"📅 اعتبار تا: {subscription.current_period_end:%Y/%m/%d}\n\n"
+        "📊 مصرف دوره جاری\n"
+        f"📁 پرونده: {cases} از {plan.max_cases_per_period}\n"
+        f"🎙 تبدیل صوت: {stt} از {plan.max_stt_seconds_per_period} ثانیه\n"
+        f"🧠 تحلیل هوشمند: {ai} از {plan.max_ai_extractions_per_period}\n"
+        f"📄 سند تولیدشده: {docs}\n\n"
+        "برای خرید، تمدید یا تغییر پلن از «🌐 ورود به پنل نویسه» استفاده کنید؛ "
+        "صورتحساب نهایی داخل همین گفتگوی بله برای شما ارسال می‌شود."
+    )
+    async_to_sync(provider.send_text)(message.external_chat_id, text, main_menu_keyboard())
+
+
 def _handle_successful_payment(*, inbound, provider, message) -> None:
     attempt, subscription, activated = process_successful_payment(message.raw or {})
     if activated:
@@ -104,7 +179,7 @@ def _handle_successful_payment(*, inbound, provider, message) -> None:
         )
     else:
         text = "✅ این پرداخت قبلاً تأیید و روی اشتراک شما اعمال شده است."
-    async_to_sync(provider.send_text)(message.external_chat_id, text)
+    async_to_sync(provider.send_text)(message.external_chat_id, text, main_menu_keyboard())
     inbound.processed_at = timezone.now()
     inbound.processing_error = ""
     inbound.save(update_fields=["processed_at", "processing_error"])
@@ -140,6 +215,8 @@ def process_bale_update(self, inbound_update_id: str) -> None:
         message_text = (normalized.message.text or "").strip()
         if message_text == PORTAL_LOGIN_LABEL:
             _send_portal_access_link(provider=provider, user=user, message=normalized.message)
+        elif message_text == BILLING_LABEL:
+            _show_billing_summary(provider=provider, user=user, message=normalized.message)
         elif handle_analysis_action(
             provider=provider,
             user=user,
@@ -168,6 +245,7 @@ def process_bale_update(self, inbound_update_id: str) -> None:
             normalized.message.external_chat_id,
             "⚠️ پرداخت دریافت شد اما برای اعمال روی اشتراک نیاز به بررسی دارد. "
             "لطفاً با پشتیبانی نویسه تماس بگیرید.",
+            main_menu_keyboard(),
         )
         return
     except Exception as exc:
