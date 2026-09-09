@@ -1,0 +1,88 @@
+from datetime import timedelta
+
+import pytest
+from django.utils import timezone
+
+from apps.accounts.models import User
+from apps.subscriptions.models import Plan, Subscription, UsageRecord
+from apps.system.models import IntegrationSettings
+from apps.tenants.models import Tenant, TenantMembership
+
+
+@pytest.mark.django_db
+def test_public_home_and_guide_reflect_current_product_identity(client):
+    IntegrationSettings.objects.update_or_create(
+        pk=1,
+        defaults={
+            "creator_name": "آراز شاه‌کرمی",
+            "creator_url": "https://araz.me",
+            "support_email": "mail@araz.me",
+            "show_billing_portal": True,
+            "billing_notice": "پرداخت آنلاین به‌زودی از طریق زیبال فعال خواهد شد.",
+        },
+    )
+
+    home = client.get("/")
+    assert home.status_code == 200
+    home_text = home.content.decode("utf-8")
+    assert "آراز شاه‌کرمی" in home_text
+    assert "mail@araz.me" in home_text
+    assert "پرونده‌ات را نگه دار" in home_text
+    assert "/finish" not in home_text
+
+    guide = client.get("/guide/")
+    assert guide.status_code == 200
+    guide_text = guide.content.decode("utf-8")
+    assert "راهنمای کامل استفاده از نویسه" in guide_text
+    assert "🏠 منوی اصلی" in guide_text
+    assert "زیبال" in guide_text
+
+
+@pytest.mark.django_db
+def test_billing_portal_shows_admin_plan_subscription_and_usage(client):
+    user = User.objects.create_user(username="billing-user")
+    tenant = Tenant.objects.create(name="حساب شخصی", slug="billing-personal")
+    TenantMembership.objects.create(tenant=tenant, user=user, role=TenantMembership.Role.OWNER)
+    plan = Plan.objects.create(
+        code="pro-test",
+        name="حرفه‌ای",
+        monthly_price=990000,
+        currency="IRR",
+        max_cases_per_period=30,
+        max_stt_seconds_per_period=7200,
+        max_ai_extractions_per_period=100,
+        max_members=3,
+    )
+    now = timezone.now()
+    Subscription.objects.create(
+        tenant=tenant,
+        plan=plan,
+        status=Subscription.Status.ACTIVE,
+        current_period_start=now - timedelta(days=1),
+        current_period_end=now + timedelta(days=29),
+    )
+    UsageRecord.objects.create(
+        tenant=tenant,
+        metric=UsageRecord.Metric.CASE_CREATED,
+        quantity=2,
+        idempotency_key="billing-test-cases",
+    )
+    IntegrationSettings.objects.update_or_create(
+        pk=1,
+        defaults={
+            "show_billing_portal": True,
+            "online_payment_enabled": False,
+            "payment_provider": IntegrationSettings.PaymentProvider.ZIBAL,
+            "billing_notice": "پرداخت آنلاین به‌زودی از طریق زیبال فعال خواهد شد.",
+            "support_email": "mail@araz.me",
+        },
+    )
+
+    client.force_login(user)
+    response = client.get("/review/billing/")
+    assert response.status_code == 200
+    text = response.content.decode("utf-8")
+    assert "حرفه‌ای" in text
+    assert "زیبال" in text
+    assert "پرداخت آنلاین به‌زودی" in text
+    assert "2" in text
