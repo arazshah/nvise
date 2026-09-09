@@ -2,9 +2,10 @@ from django.contrib import admin
 from django.urls import include, path
 
 from apps.messaging.views import bale_webhook
-from apps.system.views import health, health_live, health_ready
+from apps.system.views import health, health_live, health_ready, home
 
 urlpatterns = [
+    path("", home, name="home"),
     path("admin/", include("apps.system.urls")),
     path("admin/", admin.site.urls),
     path("health/", health, name="health"),
