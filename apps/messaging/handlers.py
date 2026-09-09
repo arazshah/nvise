@@ -3,6 +3,9 @@ from django.db import transaction
 
 from apps.cases.models import Case
 from apps.cases.services import CaseTransitionError, create_case, finish_input
+from apps.processing.models import ProcessingJob
+from apps.processing.services import ensure_attachment_job
+from apps.processing.tasks import fetch_attachment
 from apps.tenants.models import TenantMembership
 
 from .models import CaseMessage, ConversationState, InboundUpdate
@@ -68,6 +71,15 @@ def _record_message(*, inbound: InboundUpdate, user, state: ConversationState, m
         },
     )
     return case_message
+
+
+def _enqueue_attachment_if_present(*, stored: CaseMessage, message) -> None:
+    if message.file is None or not message.file.file_id:
+        return
+    attachment = ensure_attachment_job(message=stored, normalized_file=message.file)
+    fetch_job = attachment.jobs.filter(job_type=ProcessingJob.JobType.FETCH_ATTACHMENT).first()
+    if fetch_job is not None and fetch_job.status == ProcessingJob.Status.PENDING:
+        transaction.on_commit(lambda: fetch_attachment.delay(str(fetch_job.id)))
 
 
 @transaction.atomic
@@ -226,6 +238,8 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         return
 
     stored = _record_message(inbound=inbound, user=user, state=state, message=message)
+    _enqueue_attachment_if_present(stored=stored, message=message)
+
     if stored.assignment_status == CaseMessage.AssignmentStatus.UNASSIGNED:
         if state.active_case is None:
             send_text(
@@ -244,10 +258,9 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             )
         return
 
-    if message.message_type == "voice":
+    if message.file is not None:
         send_text(
             provider,
             message.external_chat_id,
-            f"صدای شما به پرونده «{stored.case.title or stored.case.case_code}» اضافه شد.\n"
-            "وضعیت: دریافت شد؛ رونویسی در فاز پردازش صوت فعال می‌شود.",
+            f"فایل به پرونده «{stored.case.title or stored.case.case_code}» اضافه شد و برای پردازش امن در صف قرار گرفت.",
         )
