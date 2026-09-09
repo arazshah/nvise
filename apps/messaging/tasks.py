@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.accounts.models import BaleIdentity
 from apps.intelligence.actions import handle_analysis_action
 from apps.portal.services import create_portal_access_token
+from apps.subscriptions.payments import PaymentError, process_successful_payment
 from apps.subscriptions.services import QuotaExceededError
 from apps.system.integrations import get_bale_config
 from apps.tenants.models import Tenant, TenantMembership
@@ -91,6 +92,24 @@ def _send_portal_access_link(*, provider, user, message) -> None:
     )
 
 
+def _handle_successful_payment(*, inbound, provider, message) -> None:
+    attempt, subscription, activated = process_successful_payment(message.raw or {})
+    if activated:
+        text = (
+            "✅ پرداخت با موفقیت تأیید شد.\n\n"
+            f"💳 پلن: {attempt.plan.name}\n"
+            f"💰 مبلغ: {attempt.amount:,} ریال\n"
+            f"📅 اعتبار تا: {subscription.current_period_end:%Y/%m/%d}\n\n"
+            "اشتراک نویسه برای حساب شما فعال/تمدید شد."
+        )
+    else:
+        text = "✅ این پرداخت قبلاً تأیید و روی اشتراک شما اعمال شده است."
+    async_to_sync(provider.send_text)(message.external_chat_id, text)
+    inbound.processed_at = timezone.now()
+    inbound.processing_error = ""
+    inbound.save(update_fields=["processed_at", "processing_error"])
+
+
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def process_bale_update(self, inbound_update_id: str) -> None:
     inbound = InboundUpdate.objects.get(pk=inbound_update_id)
@@ -109,6 +128,14 @@ def process_bale_update(self, inbound_update_id: str) -> None:
     try:
         with transaction.atomic():
             user = _resolve_bale_user(normalized.message)
+
+        if (normalized.message.raw or {}).get("successful_payment"):
+            _handle_successful_payment(
+                inbound=inbound,
+                provider=provider,
+                message=normalized.message,
+            )
+            return
 
         message_text = (normalized.message.text or "").strip()
         if message_text == PORTAL_LOGIN_LABEL:
@@ -132,6 +159,16 @@ def process_bale_update(self, inbound_update_id: str) -> None:
         inbound.save(update_fields=["processed_at", "processing_error"])
     except (QuotaExceededError, MemberLimitExceededError) as exc:
         _finish_non_retryable(inbound, provider, normalized.message, exc)
+        return
+    except PaymentError as exc:
+        inbound.processed_at = timezone.now()
+        inbound.processing_error = str(exc)[:2000]
+        inbound.save(update_fields=["processed_at", "processing_error"])
+        async_to_sync(provider.send_text)(
+            normalized.message.external_chat_id,
+            "⚠️ پرداخت دریافت شد اما برای اعمال روی اشتراک نیاز به بررسی دارد. "
+            "لطفاً با پشتیبانی نویسه تماس بگیرید.",
+        )
         return
     except Exception as exc:
         inbound.processing_error = str(exc)[:2000]
