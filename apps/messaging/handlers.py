@@ -2,13 +2,19 @@ from asgiref.sync import async_to_sync
 from django.db import transaction
 
 from apps.cases.models import Case
-from apps.cases.services import CaseTransitionError, create_case, finish_input
+from apps.cases.services import CaseTransitionError, create_case, finish_input, transition_case
 from apps.evidence.services import sync_message_evidence
 from apps.intelligence.catalog import ensure_fire_loss_schema
+from apps.intelligence.followups import (
+    next_pending_question,
+    record_follow_up_answer,
+    send_next_follow_up,
+)
 from apps.intelligence.services import start_extraction
 from apps.processing.models import ProcessingJob
 from apps.processing.services import ensure_attachment_job
 from apps.processing.tasks import fetch_attachment
+from apps.reports.services import approve_report
 from apps.tenants.models import TenantMembership
 
 from .models import CaseMessage, ConversationState, InboundUpdate
@@ -19,6 +25,7 @@ CASES_COMMANDS = {"/cases", "پرونده‌های باز", "📂 پرونده�
 ACTIVE_COMMANDS = {"/active", "پرونده فعال"}
 STATUS_COMMANDS = {"/status", "وضعیت", "📊 وضعیت"}
 FINISH_COMMANDS = {"/finish", "پایان ورود اطلاعات", "✅ پایان ورود اطلاعات"}
+APPROVE_COMMANDS = {"/approve", "تأیید گزارش", "✅ تأیید گزارش"}
 
 
 def send_text(provider, chat_id: str, text: str, keyboard: dict | None = None) -> None:
@@ -85,6 +92,48 @@ def _enqueue_attachment_if_present(*, stored: CaseMessage, message) -> None:
         transaction.on_commit(lambda: fetch_attachment.delay(str(fetch_job.id)))
 
 
+def _handle_follow_up_answer(*, state, inbound, provider, user, message) -> bool:
+    if state.state != "awaiting_followup" or state.active_case is None:
+        return False
+    if state.active_case.status != Case.Status.NEEDS_INFORMATION:
+        state.state = "idle"
+        state.pending_action = {}
+        state.save(update_fields=["state", "pending_action", "updated_at"])
+        return False
+    if message.message_type != CaseMessage.MessageType.TEXT or not (message.text or "").strip():
+        send_text(
+            provider,
+            message.external_chat_id,
+            "برای پاسخ به سؤال تکمیلی فعلاً پاسخ را به‌صورت متن ارسال کنید.",
+        )
+        return True
+
+    question = record_follow_up_answer(
+        state=state,
+        inbound=inbound,
+        user=user,
+        message=message,
+    )
+    case = question.case
+    if next_pending_question(case) is not None:
+        send_text(provider, message.external_chat_id, "پاسخ ثبت شد. سؤال بعدی:")
+        transaction.on_commit(lambda: send_next_follow_up(case))
+        return True
+
+    case = transition_case(case=case, target_status=Case.Status.FINALIZING, actor=user)
+    state.active_case = case
+    state.save(update_fields=["active_case", "updated_at"])
+    latest_run = case.extraction_runs.select_related("schema").order_by("-created_at").first()
+    schema = latest_run.schema if latest_run is not None else ensure_fire_loss_schema()
+    start_extraction(case=case, schema=schema)
+    send_text(
+        provider,
+        message.external_chat_id,
+        "همه پاسخ‌های تکمیلی ثبت شد. پرونده دوباره با اطلاعات جدید تحلیل می‌شود.",
+    )
+    return True
+
+
 @transaction.atomic
 def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
     state, _ = ConversationState.objects.select_for_update().get_or_create(
@@ -104,6 +153,127 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             "آن‌ها را به گزارش تخصصی تبدیل خواهد کرد.",
             main_menu_keyboard(),
         )
+        return
+
+    if normalized_text in STATUS_COMMANDS:
+        if state.active_case is None:
+            send_text(provider, message.external_chat_id, "در حال حاضر پرونده فعالی ندارید.")
+            return
+        case = state.active_case
+        messages = case.messages.count()
+        voices = case.messages.filter(message_type=CaseMessage.MessageType.VOICE).count()
+        images = case.messages.filter(message_type=CaseMessage.MessageType.IMAGE).count()
+        documents = case.messages.filter(message_type=CaseMessage.MessageType.DOCUMENT).count()
+        open_issues = case.field_issues.filter(status="open").count()
+        report_revision = None
+        if hasattr(case, "report") and case.report.current_revision_id:
+            report_revision = case.report.current_revision.revision_number
+        send_text(
+            provider,
+            message.external_chat_id,
+            f"پرونده فعال:\n{case.title or 'بدون عنوان'}\n\n"
+            f"پیام‌های ثبت‌شده: {messages}\nصوت: {voices}\nتصویر: {images}\n"
+            f"مدرک: {documents}\nابهام/کمبود باز: {open_issues}\n"
+            f"نسخه گزارش: {report_revision or '-'}\nوضعیت: {case.status}",
+        )
+        return
+
+    if normalized_text in APPROVE_COMMANDS:
+        if state.active_case is None or state.active_case.status != Case.Status.READY_FOR_REVIEW:
+            send_text(provider, message.external_chat_id, "گزارش آماده‌ای برای تأیید در پرونده فعال وجود ندارد.")
+            return
+        try:
+            approve_report(case=state.active_case, user=user)
+        except (ValueError, AttributeError):
+            send_text(provider, message.external_chat_id, "نسخه گزارش آماده تأیید پیدا نشد.")
+            return
+        state.active_case.refresh_from_db()
+        send_text(
+            provider,
+            message.external_chat_id,
+            f"گزارش پرونده {state.active_case.case_code} تأیید شد. وضعیت پرونده: approved",
+        )
+        return
+
+    if normalized_text in ACTIVE_COMMANDS:
+        if state.active_case is None:
+            send_text(provider, message.external_chat_id, "در حال حاضر پرونده فعالی ندارید.")
+        else:
+            send_text(
+                provider,
+                message.external_chat_id,
+                f"پرونده فعال:\n{state.active_case.title or 'بدون عنوان'}\n"
+                f"کد: {state.active_case.case_code}\nوضعیت: {state.active_case.status}",
+            )
+        return
+
+    if normalized_text.startswith("/active "):
+        requested_code = text.split(maxsplit=1)[1].strip()
+        selected = (
+            Case.objects.filter(
+                case_code__iexact=requested_code,
+                tenant__memberships__user=user,
+                tenant__memberships__is_active=True,
+                status__in=[
+                    Case.Status.DRAFT,
+                    Case.Status.OPEN,
+                    Case.Status.NEEDS_INFORMATION,
+                    Case.Status.READY_FOR_REVIEW,
+                ],
+            )
+            .distinct()
+            .first()
+        )
+        if selected is None:
+            send_text(provider, message.external_chat_id, "پرونده قابل فعال‌سازی با این کد پیدا نشد.")
+            return
+        state.active_case = selected
+        state.state = "idle"
+        state.pending_action = {}
+        state.save(update_fields=["active_case", "state", "pending_action", "updated_at"])
+        send_text(
+            provider,
+            message.external_chat_id,
+            f"پرونده فعال تغییر کرد:\n{selected.title or 'بدون عنوان'}\nکد: {selected.case_code}",
+        )
+        if selected.status == Case.Status.NEEDS_INFORMATION:
+            transaction.on_commit(lambda: send_next_follow_up(selected))
+        return
+
+    if normalized_text in CASES_COMMANDS:
+        cases = list(
+            Case.objects.filter(
+                tenant__memberships__user=user,
+                tenant__memberships__is_active=True,
+                status__in=[
+                    Case.Status.DRAFT,
+                    Case.Status.OPEN,
+                    Case.Status.FINALIZING,
+                    Case.Status.NEEDS_INFORMATION,
+                    Case.Status.READY_FOR_REVIEW,
+                ],
+            )
+            .distinct()
+            .order_by("-updated_at")[:10]
+        )
+        if not cases:
+            send_text(provider, message.external_chat_id, "پرونده بازی ندارید.")
+            return
+        lines = ["پرونده‌های باز شما:"]
+        for item in cases:
+            marker = " ← فعال" if state.active_case_id == item.id else ""
+            lines.append(f"• {item.title or 'بدون عنوان'} — {item.case_code} — {item.status}{marker}")
+        lines.append("\nبرای فعال‌سازی یک پرونده بنویسید: /active CASE_CODE")
+        send_text(provider, message.external_chat_id, "\n".join(lines))
+        return
+
+    if _handle_follow_up_answer(
+        state=state,
+        inbound=inbound,
+        provider=provider,
+        user=user,
+        message=message,
+    ):
         return
 
     if state.state == "awaiting_case_title" and message.message_type == "text":
@@ -134,91 +304,6 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         )
         return
 
-    if normalized_text in CASES_COMMANDS:
-        cases = list(
-            Case.objects.filter(
-                tenant__memberships__user=user,
-                tenant__memberships__is_active=True,
-                status__in=[
-                    Case.Status.DRAFT,
-                    Case.Status.OPEN,
-                    Case.Status.FINALIZING,
-                    Case.Status.NEEDS_INFORMATION,
-                    Case.Status.READY_FOR_REVIEW,
-                ],
-            )
-            .distinct()
-            .order_by("-updated_at")[:10]
-        )
-        if not cases:
-            send_text(provider, message.external_chat_id, "پرونده بازی ندارید.")
-            return
-        lines = ["پرونده‌های باز شما:"]
-        for item in cases:
-            marker = " ← فعال" if state.active_case_id == item.id else ""
-            lines.append(f"• {item.title or 'بدون عنوان'} — {item.case_code}{marker}")
-        lines.append("\nبرای فعال‌سازی یک پرونده بنویسید: /active CASE_CODE")
-        send_text(provider, message.external_chat_id, "\n".join(lines))
-        return
-
-    if normalized_text.startswith("/active "):
-        requested_code = text.split(maxsplit=1)[1].strip()
-        selected = (
-            Case.objects.filter(
-                case_code__iexact=requested_code,
-                tenant__memberships__user=user,
-                tenant__memberships__is_active=True,
-                status__in=[Case.Status.DRAFT, Case.Status.OPEN],
-            )
-            .distinct()
-            .first()
-        )
-        if selected is None:
-            send_text(
-                provider,
-                message.external_chat_id,
-                "پرونده باز قابل فعال‌سازی با این کد پیدا نشد.",
-            )
-            return
-        state.active_case = selected
-        state.save(update_fields=["active_case", "updated_at"])
-        send_text(
-            provider,
-            message.external_chat_id,
-            f"پرونده فعال تغییر کرد:\n{selected.title or 'بدون عنوان'}\nکد: {selected.case_code}",
-        )
-        return
-
-    if normalized_text in ACTIVE_COMMANDS:
-        if state.active_case is None:
-            send_text(provider, message.external_chat_id, "در حال حاضر پرونده فعالی ندارید.")
-        else:
-            send_text(
-                provider,
-                message.external_chat_id,
-                f"پرونده فعال:\n{state.active_case.title or 'بدون عنوان'}\n"
-                f"کد: {state.active_case.case_code}\nوضعیت: {state.active_case.status}",
-            )
-        return
-
-    if normalized_text in STATUS_COMMANDS:
-        if state.active_case is None:
-            send_text(provider, message.external_chat_id, "در حال حاضر پرونده فعالی ندارید.")
-            return
-        case = state.active_case
-        messages = case.messages.count()
-        voices = case.messages.filter(message_type=CaseMessage.MessageType.VOICE).count()
-        images = case.messages.filter(message_type=CaseMessage.MessageType.IMAGE).count()
-        documents = case.messages.filter(message_type=CaseMessage.MessageType.DOCUMENT).count()
-        send_text(
-            provider,
-            message.external_chat_id,
-            f"پرونده فعال:\n{case.title or 'بدون عنوان'}\n\n"
-            f"پیام‌های ثبت‌شده: {messages}\nصوت: {voices}\nتصویر: {images}\n"
-            f"مدرک: {documents}\nوضعیت: {case.status}",
-        )
-        return
-
     if normalized_text in FINISH_COMMANDS:
         if state.active_case is None:
             send_text(provider, message.external_chat_id, "پرونده فعالی برای پایان ورود اطلاعات وجود ندارد.")
@@ -226,11 +311,7 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         try:
             state.active_case = finish_input(case=state.active_case, actor=user)
         except CaseTransitionError:
-            send_text(
-                provider,
-                message.external_chat_id,
-                "این پرونده در وضعیت فعلی امکان پایان ورود اطلاعات ندارد.",
-            )
+            send_text(provider, message.external_chat_id, "این پرونده در وضعیت فعلی امکان پایان ورود اطلاعات ندارد.")
             return
         schema = ensure_fire_loss_schema()
         start_extraction(case=state.active_case, schema=schema)
@@ -260,8 +341,8 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             send_text(
                 provider,
                 message.external_chat_id,
-                f"ورود اطلاعات پرونده «{state.active_case.title or state.active_case.case_code}» پایان یافته است. "
-                "این پیام موقتاً بدون پرونده نگهداری شد و خودکار به پرونده بسته اضافه نشد.",
+                f"پرونده «{state.active_case.title or state.active_case.case_code}» در وضعیت "
+                f"{state.active_case.status} است. این پیام بدون اتصال خودکار به پرونده نگهداری شد.",
             )
         return
 
