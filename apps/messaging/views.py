@@ -7,6 +7,7 @@ from django.utils.crypto import constant_time_compare
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from apps.system.integrations import get_bale_config
 from apps.system.rate_limit import allow_fixed_window
 
 from .models import InboundUpdate
@@ -17,15 +18,16 @@ from .tasks import process_bale_update
 @csrf_exempt
 @require_POST
 def bale_webhook(request: HttpRequest, secret: str) -> JsonResponse:
-    configured_secret = settings.BALE_WEBHOOK_SECRET
-    if not configured_secret or not constant_time_compare(secret, configured_secret):
+    config = get_bale_config()
+    configured_secret = config.webhook_secret
+    if not config.enabled or not configured_secret or not constant_time_compare(secret, configured_secret):
         return JsonResponse({"ok": False}, status=404)
 
     remote_addr = request.META.get("REMOTE_ADDR", "unknown")
     if not allow_fixed_window(
         namespace="bale_webhook",
         key=remote_addr,
-        limit=settings.BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE,
+        limit=config.rate_limit_per_minute,
         window_seconds=60,
     ):
         response = JsonResponse({"ok": False, "error": "rate_limited"}, status=429)
@@ -50,7 +52,7 @@ def bale_webhook(request: HttpRequest, secret: str) -> JsonResponse:
     with transaction.atomic():
         inbound, created = InboundUpdate.objects.get_or_create(
             provider="bale",
-            bot_id=settings.BALE_BOT_ID,
+            bot_id=config.bot_id,
             external_update_id=normalized.update_id,
             defaults={"payload": payload},
         )
