@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -11,8 +11,7 @@ from apps.tenants.models import Tenant
 
 @staff_member_required
 def saas_dashboard(request):
-    now = timezone.now()
-    since = now - timedelta(days=30)
+    since = timezone.now() - timedelta(days=30)
     active_statuses = [Subscription.Status.ACTIVE, Subscription.Status.TRIALING]
     active_subscriptions = Subscription.objects.filter(status__in=active_statuses).select_related(
         "tenant", "plan"
@@ -26,7 +25,7 @@ def saas_dashboard(request):
     }
     tenant_rows = (
         Tenant.objects.annotate(
-            active_members=Count("memberships", filter=__import__("django").db.models.Q(memberships__is_active=True))
+            active_members=Count("memberships", filter=Q(memberships__is_active=True))
         )
         .select_related("subscription__plan")
         .order_by("name")[:100]
