@@ -16,3 +16,15 @@ def store_private_bytes(*, attachment_id: str, filename: str, content: bytes) ->
     temporary.replace(destination)
 
     return relative.as_posix(), digest
+
+
+def read_private_bytes(storage_key: str) -> bytes:
+    relative = Path(storage_key)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("Invalid private storage key")
+
+    root = settings.PRIVATE_MEDIA_ROOT.resolve()
+    path = (root / relative).resolve()
+    if root != path and root not in path.parents:
+        raise ValueError("Private storage key escapes storage root")
+    return path.read_bytes()
