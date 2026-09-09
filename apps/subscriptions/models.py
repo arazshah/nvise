@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 
 from apps.tenants.models import Tenant
@@ -44,6 +45,50 @@ class Subscription(models.Model):
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class PaymentAttempt(models.Model):
+    class Status(models.TextChoices):
+        CREATED = "created", "Created"
+        INVOICE_SENT = "invoice_sent", "Invoice sent"
+        PRECHECKOUT_APPROVED = "precheckout_approved", "Pre-checkout approved"
+        PAID = "paid", "Paid"
+        REJECTED = "rejected", "Rejected"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="payment_attempts")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="payment_attempts")
+    plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="payment_attempts")
+    provider = models.CharField(max_length=24, default="bale")
+    status = models.CharField(max_length=24, choices=Status.choices, default=Status.CREATED, db_index=True)
+    payload = models.CharField(max_length=128, unique=True)
+    amount = models.PositiveBigIntegerField(help_text="Amount in Iranian rials (IRR).")
+    currency = models.CharField(max_length=8, default="IRR")
+    external_user_id = models.CharField(max_length=128)
+    external_chat_id = models.CharField(max_length=128)
+    invoice_message_id = models.CharField(max_length=128, blank=True)
+    pre_checkout_query_id = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    provider_payment_charge_id = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    provider_tracking_id = models.CharField(max_length=128, null=True, blank=True, unique=True)
+    failure_reason = models.CharField(max_length=500, blank=True)
+    raw_precheckout = models.JSONField(default=dict, blank=True)
+    raw_successful_payment = models.JSONField(default=dict, blank=True)
+    invoice_sent_at = models.DateTimeField(null=True, blank=True)
+    precheckout_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["tenant", "status", "created_at"], name="pay_tenant_status_idx"),
+            models.Index(fields=["external_user_id", "status"], name="pay_bale_user_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.plan.code}:{self.amount}:{self.status}"
 
 
 class Entitlement(models.Model):
