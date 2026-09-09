@@ -11,12 +11,56 @@ from apps.system.integrations import get_bale_config
 from .models import CaseFieldIssue, FollowUpQuestion
 
 
+MAX_FOLLOW_UP_ATTEMPTS = 2
+UNAVAILABLE_LABEL = "🚫 این اطلاعات در دسترس نیست"
+WAIVE_LABEL = "⏭ با اطلاعات فعلی ادامه بده"
+
+
+def _detail_lines(issue: CaseFieldIssue) -> list[str]:
+    details = issue.details or {}
+    lines: list[str] = []
+    if issue.issue_type == CaseFieldIssue.IssueType.MISSING:
+        lines.append("این مورد در متن‌ها، صوت‌ها یا مدارک پرونده پیدا نشد.")
+    elif issue.issue_type == CaseFieldIssue.IssueType.CONFLICT:
+        values = details.get("values") or details.get("candidates") or []
+        if values:
+            rendered = "، ".join(str(value) for value in values[:4])
+            lines.append(f"چند مقدار متفاوت پیدا شده است: {rendered}")
+        else:
+            lines.append("برای این مورد اطلاعات متفاوت یا متناقض پیدا شده است.")
+    elif issue.issue_type == CaseFieldIssue.IssueType.INVALID:
+        value = details.get("value")
+        if value is not None:
+            lines.append(f"مقدار فعلی «{value}» با قالب مورد انتظار سازگار نیست.")
+        else:
+            lines.append("مقدار استخراج‌شده با قالب مورد انتظار سازگار نیست.")
+    if issue.resolution_note:
+        lines.append(f"پاسخ قبلی شما: {issue.resolution_note}")
+    if issue.attempt_count >= MAX_FOLLOW_UP_ATTEMPTS:
+        lines.append("این مورد قبلاً بررسی شده و برای جلوگیری از تکرار، می‌توانید آن را نامشخص بگذارید یا با اطلاعات فعلی ادامه دهید.")
+    return lines
+
+
 def _question_text(issue: CaseFieldIssue) -> str:
     if issue.issue_type == CaseFieldIssue.IssueType.MISSING:
-        return f"لطفاً «{issue.field.label}» را مشخص کنید."
-    if issue.issue_type == CaseFieldIssue.IssueType.CONFLICT:
-        return f"برای «{issue.field.label}» اطلاعات متناقض ثبت شده است. لطفاً مقدار صحیح را تأیید کنید."
-    return f"لطفاً مقدار معتبر برای «{issue.field.label}» ارائه کنید."
+        prompt = f"لطفاً اگر در دسترس است، «{issue.field.label}» را مشخص کنید."
+    elif issue.issue_type == CaseFieldIssue.IssueType.CONFLICT:
+        prompt = f"لطفاً مقدار صحیح «{issue.field.label}» را مشخص یا تأیید کنید."
+    else:
+        prompt = f"لطفاً مقدار معتبر برای «{issue.field.label}» ارائه کنید."
+    details = _detail_lines(issue)
+    return "\n".join([*details, "", prompt]).strip()
+
+
+def follow_up_keyboard() -> dict:
+    return {
+        "keyboard": [
+            [{"text": UNAVAILABLE_LABEL}],
+            [{"text": WAIVE_LABEL}],
+        ],
+        "resize_keyboard": True,
+        "one_time_keyboard": True,
+    }
 
 
 @transaction.atomic
@@ -28,10 +72,20 @@ def ensure_follow_up_questions(case: Case) -> list[FollowUpQuestion]:
         .order_by("field__sequence", "created_at")
     )
     for issue in issues:
-        question, _ = FollowUpQuestion.objects.get_or_create(
+        question, created = FollowUpQuestion.objects.get_or_create(
             issue=issue,
             defaults={"case": case, "question_text": _question_text(issue)},
         )
+        if not created:
+            question.question_text = _question_text(issue)
+            if question.status == FollowUpQuestion.Status.ANSWERED:
+                question.status = FollowUpQuestion.Status.PENDING
+                question.asked_at = None
+                question.answered_at = None
+                question.answer_evidence = None
+            question.save(
+                update_fields=["question_text", "status", "asked_at", "answered_at", "answer_evidence"]
+            )
         questions.append(question)
     return questions
 
@@ -40,6 +94,7 @@ def next_pending_question(case: Case) -> FollowUpQuestion | None:
     return (
         FollowUpQuestion.objects.filter(
             case=case,
+            issue__status=CaseFieldIssue.Status.OPEN,
             status__in=[FollowUpQuestion.Status.PENDING, FollowUpQuestion.Status.ASKED],
         )
         .select_related("issue__field")
@@ -62,10 +117,13 @@ def send_next_follow_up(case: Case) -> FollowUpQuestion | None:
     if state is None or not bale.enabled or not bale.bot_token:
         return question
 
-    all_questions = FollowUpQuestion.objects.filter(case=case)
-    total = all_questions.count()
-    answered = all_questions.filter(status=FollowUpQuestion.Status.ANSWERED).count()
-    number = min(answered + 1, total) if total else 1
+    open_questions = FollowUpQuestion.objects.filter(
+        case=case,
+        issue__status=CaseFieldIssue.Status.OPEN,
+    )
+    total = open_questions.count()
+    before = open_questions.filter(issue__field__sequence__lt=question.issue.field.sequence).count()
+    number = min(before + 1, total) if total else 1
 
     provider = BaleProvider(bale.bot_token)
     async_to_sync(provider.send_text)(
@@ -73,9 +131,10 @@ def send_next_follow_up(case: Case) -> FollowUpQuestion | None:
         f"🧩 تکمیل اطلاعات پرونده\n"
         f"━━━━━━━━━━━━━━\n"
         f"📝 {case.title or case.case_code}\n"
-        f"❓ سؤال {number} از {total or 1}\n\n"
+        f"❓ مورد {number} از {total or 1}\n\n"
         f"{question.question_text}\n\n"
-        "✍️ پاسخ را به‌صورت متن ارسال کنید.",
+        "✍️ می‌توانید پاسخ را بنویسید یا یکی از گزینه‌های زیر را انتخاب کنید.",
+        follow_up_keyboard(),
     )
     question.status = FollowUpQuestion.Status.ASKED
     question.asked_at = timezone.now()
@@ -94,32 +153,53 @@ def record_follow_up_answer(*, state: ConversationState, inbound, user, message)
         .select_related("case", "issue")
         .get(pk=question_id, case=state.active_case)
     )
-    external_message_id = message.external_message_id or f"update-{inbound.external_update_id}"
-    case_message, _ = CaseMessage.objects.get_or_create(
-        provider=message.provider,
-        external_chat_id=message.external_chat_id,
-        external_message_id=external_message_id,
-        defaults={
-            "inbound_update": inbound,
-            "user": user,
-            "case": question.case,
-            "assignment_status": CaseMessage.AssignmentStatus.ASSIGNED,
-            "message_type": message.message_type,
-            "text": message.text or "",
-            "raw_payload": message.raw or {},
-            "sent_at": message.sent_at,
-        },
-    )
-    evidence = sync_message_evidence(case_message)
-    if evidence is None:
-        raise ValueError("Follow-up answer must contain text")
-    question.answer_evidence = evidence
-    question.status = FollowUpQuestion.Status.ANSWERED
-    question.answered_at = timezone.now()
-    question.save(update_fields=["answer_evidence", "status", "answered_at"])
-    question.issue.status = CaseFieldIssue.Status.RESOLVED
-    question.issue.resolved_at = timezone.now()
-    question.issue.save(update_fields=["status", "resolved_at"])
+    answer_text = (message.text or "").strip()
+    now = timezone.now()
+
+    if answer_text == UNAVAILABLE_LABEL:
+        question.issue.status = CaseFieldIssue.Status.UNAVAILABLE
+        question.issue.resolution_note = "کاربر اعلام کرد این اطلاعات در دسترس نیست."
+        question.issue.resolved_at = now
+        question.issue.save(update_fields=["status", "resolution_note", "resolved_at"])
+        question.status = FollowUpQuestion.Status.CANCELLED
+        question.answered_at = now
+        question.save(update_fields=["status", "answered_at"])
+    elif answer_text == WAIVE_LABEL:
+        question.issue.status = CaseFieldIssue.Status.WAIVED
+        question.issue.resolution_note = "کاربر خواست با اطلاعات فعلی ادامه داده شود."
+        question.issue.resolved_at = now
+        question.issue.save(update_fields=["status", "resolution_note", "resolved_at"])
+        question.status = FollowUpQuestion.Status.CANCELLED
+        question.answered_at = now
+        question.save(update_fields=["status", "answered_at"])
+    else:
+        external_message_id = message.external_message_id or f"update-{inbound.external_update_id}"
+        case_message, _ = CaseMessage.objects.get_or_create(
+            provider=message.provider,
+            external_chat_id=message.external_chat_id,
+            external_message_id=external_message_id,
+            defaults={
+                "inbound_update": inbound,
+                "user": user,
+                "case": question.case,
+                "assignment_status": CaseMessage.AssignmentStatus.ASSIGNED,
+                "message_type": message.message_type,
+                "text": message.text or "",
+                "raw_payload": message.raw or {},
+                "sent_at": message.sent_at,
+            },
+        )
+        evidence = sync_message_evidence(case_message)
+        if evidence is None:
+            raise ValueError("Follow-up answer must contain text")
+        question.answer_evidence = evidence
+        question.status = FollowUpQuestion.Status.ANSWERED
+        question.answered_at = now
+        question.save(update_fields=["answer_evidence", "status", "answered_at"])
+        question.issue.attempt_count += 1
+        question.issue.resolution_note = answer_text[:1000]
+        question.issue.save(update_fields=["attempt_count", "resolution_note"])
+
     state.state = "idle"
     state.pending_action = {}
     state.save(update_fields=["state", "pending_action", "updated_at"])
