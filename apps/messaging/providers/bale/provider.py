@@ -3,10 +3,15 @@ from typing import Any
 
 from ..base import MessagingProvider
 from ..schemas import NormalizedFile, NormalizedMessage, NormalizedUpdate
+from .client import BaleClient
 
 
 class BaleProvider(MessagingProvider):
     key = "bale"
+
+    def __init__(self, token: str | None = None) -> None:
+        self.token = token
+        self.client = BaleClient(token) if token else None
 
     def parse_update(self, payload: dict[str, Any]) -> NormalizedUpdate:
         update_id = str(payload.get("update_id", ""))
@@ -85,14 +90,24 @@ class BaleProvider(MessagingProvider):
             file_size=payload.get("file_size"),
         )
 
+    def _require_client(self) -> BaleClient:
+        if self.client is None:
+            raise RuntimeError("Bale provider requires a token for outbound API calls")
+        return self.client
+
     async def send_text(self, chat_id: str, text: str, keyboard: dict | None = None) -> dict:
-        raise NotImplementedError("Bale HTTP client will be added after webhook ingestion")
+        return await self._require_client().send_message(chat_id, text, keyboard)
 
     async def send_document(self, chat_id: str, document: bytes, filename: str) -> dict:
-        raise NotImplementedError("Bale HTTP client will be added in document delivery phase")
+        raise NotImplementedError("Multipart document upload will be added in document delivery phase")
 
     async def answer_callback(self, callback_id: str, text: str | None = None) -> None:
-        raise NotImplementedError("Bale HTTP client will be added after webhook ingestion")
+        await self._require_client().answer_callback_query(callback_id, text)
 
     async def get_file(self, file_id: str) -> dict:
-        raise NotImplementedError("Bale file retrieval will be added in attachment phase")
+        return await self._require_client().get_file(file_id)
+
+    def file_download_url(self, file_path: str) -> str:
+        if not self.token:
+            raise RuntimeError("Bale provider requires a token to build download URLs")
+        return f"https://tapi.bale.ai/file/bot{self.token}/{file_path.lstrip('/')}"
