@@ -2,8 +2,7 @@ from django.db import transaction
 
 from apps.audit.services import record_audit_event
 from apps.cases.models import Case, CaseEvent
-from apps.cases.services import approve_case
-from apps.intelligence.models import ExtractedFact
+from apps.intelligence.models import CaseFieldIssue, ExtractedFact
 
 from .models import Report, ReportApproval, ReportRevision, ReportSection
 
@@ -60,22 +59,38 @@ def _latest_fact_map(case: Case) -> dict:
 
 @transaction.atomic
 def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
-    if case.status != Case.Status.READY_FOR_REVIEW:
-        raise ValueError("Report can only be generated for a case ready for review")
-    facts = _latest_fact_map(case)
-    report, _ = Report.objects.select_for_update().get_or_create(case=case)
+    locked_case = Case.objects.select_for_update().get(pk=case.pk)
+    if locked_case.lifecycle_status != Case.LifecycleStatus.ACTIVE:
+        raise ValueError("Report can only be generated for an active case")
+    if locked_case.analysis_status not in {
+        Case.AnalysisStatus.COMPLETED,
+        Case.AnalysisStatus.NEEDS_REVIEW,
+    }:
+        raise ValueError("Case analysis must be completed before generating a report")
+    if CaseFieldIssue.objects.filter(
+        case=locked_case,
+        status=CaseFieldIssue.Status.OPEN,
+    ).exists():
+        raise ValueError("Open analysis issues must be resolved or waived before generating a report")
+
+    locked_case.status = Case.Status.READY_FOR_REVIEW
+    locked_case.report_status = Case.ReportStatus.READY_FOR_REVIEW
+    locked_case.save(update_fields=["status", "report_status", "updated_at"])
+
+    facts = _latest_fact_map(locked_case)
+    report, _ = Report.objects.select_for_update().get_or_create(case=locked_case)
     next_revision = (report.revisions.order_by("-revision_number").values_list("revision_number", flat=True).first() or 0) + 1
     revision = ReportRevision.objects.create(
         report=report,
         revision_number=next_revision,
-        title=f"گزارش کارشناسی خسارت - {case.title or case.case_code}",
+        title=f"گزارش کارشناسی خسارت - {locked_case.title or locked_case.case_code}",
         summary="گزارش ساختاری بر پایه اطلاعات ثبت‌شده و شواهد قابل ردیابی پرونده.",
-        structured_data={"case_code": case.case_code, "facts": facts},
+        structured_data={"case_code": locked_case.case_code, "facts": facts},
         source_snapshot={
-            "case_status": case.status,
-            "vertical": case.vertical_key,
-            "sub_vertical": case.sub_vertical_key,
-            "open_issues": case.field_issues.filter(status="open").count(),
+            "case_status": locked_case.status,
+            "vertical": locked_case.vertical_key,
+            "sub_vertical": locked_case.sub_vertical_key,
+            "open_issues": 0,
         },
         created_by=created_by,
     )
@@ -97,7 +112,7 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
     report.status = Report.Status.READY_FOR_REVIEW
     report.save(update_fields=["current_revision", "status", "updated_at"])
     CaseEvent.objects.create(
-        case=case,
+        case=locked_case,
         event_type="report.revision_created",
         actor=created_by,
         payload={"report_id": str(report.id), "revision": revision.revision_number},
@@ -105,7 +120,7 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
     record_audit_event(
         event_type="report.revision_created",
         actor=created_by,
-        case=case,
+        case=locked_case,
         object_type="report_revision",
         object_id=revision.id,
         metadata={"report_id": str(report.id), "revision": revision.revision_number},
@@ -190,6 +205,8 @@ def approve_report(*, case: Case, user, note: str = "") -> Report:
     )
     report.status = Report.Status.APPROVED
     report.save(update_fields=["status", "updated_at"])
+    from apps.cases.services import approve_case
+
     approve_case(case=case, actor=user)
     record_audit_event(
         event_type="report.approved",
