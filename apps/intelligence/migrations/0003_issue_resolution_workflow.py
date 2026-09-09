@@ -1,5 +1,6 @@
 from django.db import migrations, models
 from django.db.models import Count
+from django.utils import timezone
 
 
 def deduplicate_open_case_field_issues(apps, schema_editor):
@@ -11,6 +12,8 @@ def deduplicate_open_case_field_issues(apps, schema_editor):
         .annotate(total=Count("id"))
         .filter(total__gt=1)
     )
+
+    now = timezone.now()
 
     for group in duplicate_groups.iterator():
         issues = list(
@@ -32,7 +35,15 @@ def deduplicate_open_case_field_issues(apps, schema_editor):
             keeper.attempt_count = max_attempt_count
             keeper.save(update_fields=["attempt_count"])
 
-        CaseFieldIssue.objects.filter(id__in=[issue.id for issue in duplicates]).delete()
+        duplicate_ids = [issue.id for issue in duplicates]
+        CaseFieldIssue.objects.filter(id__in=duplicate_ids).update(
+            status="resolved",
+            resolution_note=(
+                "این مورد تکراری هنگام ارتقای ساختار workflow ادغام شد؛ "
+                "سابقه سؤال‌ها و شواهد آن حفظ شده است."
+            ),
+            resolved_at=now,
+        )
 
 
 def noop_reverse(apps, schema_editor):
