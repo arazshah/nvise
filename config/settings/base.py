@@ -7,6 +7,7 @@ env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     MAX_PROVIDER_FILE_BYTES=(int, 20 * 1024 * 1024),
     STT_TIMEOUT_SECONDS=(float, 120.0),
+    AI_EXTRACTION_TIMEOUT_SECONDS=(float, 120.0),
 )
 
 env_file = BASE_DIR / ".env"
@@ -31,6 +32,8 @@ INSTALLED_APPS = [
     "apps.messaging",
     "apps.processing",
     "apps.transcription",
+    "apps.evidence",
+    "apps.intelligence",
 ]
 
 MIDDLEWARE = [
@@ -98,3 +101,8 @@ STT_PROVIDER = env("STT_PROVIDER", default="http")
 STT_HTTP_ENDPOINT = env("STT_HTTP_ENDPOINT", default="")
 STT_API_KEY = env("STT_API_KEY", default="")
 STT_TIMEOUT_SECONDS = env.float("STT_TIMEOUT_SECONDS", default=120.0)
+
+AI_EXTRACTION_PROVIDER = env("AI_EXTRACTION_PROVIDER", default="http")
+AI_EXTRACTION_ENDPOINT = env("AI_EXTRACTION_ENDPOINT", default="")
+AI_EXTRACTION_API_KEY = env("AI_EXTRACTION_API_KEY", default="")
+AI_EXTRACTION_TIMEOUT_SECONDS = env.float("AI_EXTRACTION_TIMEOUT_SECONDS", default=120.0)
