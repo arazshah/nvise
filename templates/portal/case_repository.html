@@ -1,4 +1,4 @@
-{% load analysis_tags %}
+{% load analysis_tags jalali_tags %}
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
@@ -14,73 +14,13 @@
 <div class="wrap">
   <div class="top">
     <div class="head"><div class="muted">📁 مخزن پرونده</div><h1>{{ case.title|default:'بدون عنوان' }}</h1><div class="muted">{{ case.case_code }}</div></div>
-    <div class="actions">
-      <a class="btn secondary" href="{% url 'portal:dashboard' %}">داشبورد</a>
-      <a class="btn secondary" href="{% url 'portal:case-list' %}">همه پرونده‌ها</a>
-      {% if case.lifecycle_status == 'active' %}<a class="btn" href="{% url 'portal:analysis-overview' case.case_code %}">🧠 تحلیل و تصمیم</a>{% endif %}
-      {% if report and report.current_revision_id %}<a class="btn success" href="{% url 'portal:case-review' case.case_code %}">📄 مشاهده گزارش</a>{% endif %}
-      {% if case.lifecycle_status == 'active' %}
-      <form method="post" action="{% url 'portal:archive-case' case.case_code %}">{% csrf_token %}<button class="btn warn" type="submit">📦 بایگانی پرونده</button></form>
-      {% elif case.lifecycle_status == 'archived' %}
-      <form method="post" action="{% url 'portal:reopen-case' case.case_code %}">{% csrf_token %}<button class="btn success" type="submit">🔓 بازگشایی پرونده</button></form>
-      {% endif %}
-    </div>
+    <div class="actions"><a class="btn secondary" href="{% url 'portal:dashboard' %}">داشبورد</a><a class="btn secondary" href="{% url 'portal:case-list' %}">همه پرونده‌ها</a>{% if case.lifecycle_status == 'active' %}<a class="btn" href="{% url 'portal:analysis-overview' case.case_code %}">🧠 تحلیل و تصمیم</a>{% endif %}{% if report and report.current_revision_id %}<a class="btn success" href="{% url 'portal:case-review' case.case_code %}">📄 مشاهده گزارش</a>{% endif %}{% if case.lifecycle_status == 'active' %}<form method="post" action="{% url 'portal:archive-case' case.case_code %}">{% csrf_token %}<button class="btn warn" type="submit">📦 بایگانی پرونده</button></form>{% elif case.lifecycle_status == 'archived' %}<form method="post" action="{% url 'portal:reopen-case' case.case_code %}">{% csrf_token %}<button class="btn success" type="submit">🔓 بازگشایی پرونده</button></form>{% endif %}</div>
   </div>
-
   {% if case.lifecycle_status == 'archived' %}<div class="archive">📦 این پرونده بایگانی شده است. همه محتوا و مدارک آن محفوظ مانده و در هر زمان می‌توانید آن را بازگشایی کنید.</div>{% endif %}
-
-  {% if case.analysis_status == 'completed' or case.analysis_status == 'needs_review' %}
-    {% analysis_summary case as analysis %}
-    <section class="analysis">
-      <h2>🧠 نتیجه آخرین تحلیل</h2>
-      <div class="lead">قبل از رفع ابهام‌ها یا تولید گزارش، خلاصه نتیجه تحلیل را بررسی کنید.</div>
-      <div class="analysis-grid">
-        <div class="analysis-stat"><span>اطلاعات قابل استفاده</span><b>{{ analysis.usable_facts }}</b></div>
-        <div class="analysis-stat"><span>موارد متناقض</span><b>{{ analysis.conflicts }}</b></div>
-        <div class="analysis-stat"><span>موارد نامعتبر</span><b>{{ analysis.invalid }}</b></div>
-        <div class="analysis-stat"><span>موارد پیدا نشده</span><b>{{ analysis.missing }}</b></div>
-      </div>
-      <div class="analysis-note">
-        {% if analysis.has_issues %}
-          ⚠️ در مجموع {{ analysis.open_issues }} مورد نیازمند تصمیم شماست. جزئیات و انتخاب‌های بعدی در صفحه تحلیل در دسترس‌اند.
-        {% else %}
-          ✅ مورد حل‌نشده‌ای باقی نمانده است. می‌توانید از صفحه تحلیل گزارش را تولید کنید یا قبل از آن مدارک را مرور کنید.
-        {% endif %}
-      </div>
-      <a class="analysis-link" href="{% url 'portal:analysis-overview' case.case_code %}">مشاهده جزئیات و انتخاب اقدام بعدی ←</a>
-    </section>
-  {% elif case.lifecycle_status == 'active' %}
-    <section class="analysis">
-      <h2>🧠 تحلیل پرونده</h2>
-      <div class="lead">این پرونده می‌تواند فقط به‌عنوان مخزن مدارک باقی بماند. هر زمان نیاز داشتید، تحلیل را جداگانه شروع کنید.</div>
-      <a class="analysis-link" href="{% url 'portal:analysis-overview' case.case_code %}">رفتن به تحلیل پرونده ←</a>
-    </section>
-  {% endif %}
-
-  <div class="summary">
-    <div class="stat"><span class="muted">همه موارد</span><b>{{ counts.all }}</b></div>
-    <div class="stat"><span class="muted">صوت‌ها</span><b>{{ counts.audio }}</b></div>
-    <div class="stat"><span class="muted">تصاویر</span><b>{{ counts.image }}</b></div>
-    <div class="stat"><span class="muted">مدارک</span><b>{{ counts.document }}</b></div>
-    <div class="stat"><span class="muted">یادداشت‌ها</span><b>{{ counts.note }}</b></div>
-  </div>
-
-  <div class="tabs">
-    <a class="tab {% if kind == 'all' %}active{% endif %}" href="?type=all">همه</a>
-    <a class="tab {% if kind == 'audio' %}active{% endif %}" href="?type=audio">🎙 صوت</a>
-    <a class="tab {% if kind == 'image' %}active{% endif %}" href="?type=image">🖼 تصویر</a>
-    <a class="tab {% if kind == 'document' %}active{% endif %}" href="?type=document">📄 مدرک</a>
-    <a class="tab {% if kind == 'note' %}active{% endif %}" href="?type=note">💬 یادداشت</a>
-  </div>
-
-  {% for row in rows %}<article class="card"><div class="row"><div>
-    <div class="kind">{% if row.message.message_type == 'voice' or row.message.message_type == 'audio' %}🎙 فایل صوتی{% elif row.message.message_type == 'image' %}🖼 تصویر{% elif row.message.message_type == 'document' %}📄 مدرک{% elif row.message.message_type == 'text' %}💬 یادداشت{% else %}📌 محتوای پرونده{% endif %}</div>
-    <div class="meta">{{ row.message.sent_at|default:row.message.received_at|date:'Y/m/d H:i' }}</div>
-  </div><span class="badge">ذخیره‌شده</span></div>
-  {% if row.message.text %}<div class="text">{{ row.message.text }}</div>{% endif %}
-  {% if row.attachment %}<div class="file"><span>{{ row.attachment.original_name|default:'فایل پیوست' }}</span><span class="muted">{% if row.attachment.actual_size %}{{ row.attachment.actual_size|filesizeformat }}{% endif %}</span>{% if row.attachment.status == 'stored' %}<a href="{% url 'portal:download-attachment' case.case_code row.attachment.id %}">⬇️ دانلود امن</a>{% else %}<span class="muted">در حال پردازش</span>{% endif %}</div>{% endif %}
-  {% if row.transcript %}<div class="transcript"><strong>📝 متن استخراج‌شده از صوت</strong><div class="text">{{ row.transcript.text }}</div></div>{% endif %}
-  </article>{% empty %}<div class="empty">در این بخش هنوز محتوایی ثبت نشده است.</div>{% endfor %}
+  {% if case.analysis_status == 'completed' or case.analysis_status == 'needs_review' %}{% analysis_summary case as analysis %}<section class="analysis"><h2>🧠 نتیجه آخرین تحلیل</h2><div class="lead">قبل از رفع ابهام‌ها یا تولید گزارش، خلاصه نتیجه تحلیل را بررسی کنید.</div><div class="analysis-grid"><div class="analysis-stat"><span>اطلاعات قابل استفاده</span><b>{{ analysis.usable_facts }}</b></div><div class="analysis-stat"><span>موارد متناقض</span><b>{{ analysis.conflicts }}</b></div><div class="analysis-stat"><span>موارد نامعتبر</span><b>{{ analysis.invalid }}</b></div><div class="analysis-stat"><span>موارد پیدا نشده</span><b>{{ analysis.missing }}</b></div></div><div class="analysis-note">{% if analysis.has_issues %}⚠️ در مجموع {{ analysis.open_issues }} مورد نیازمند تصمیم شماست. جزئیات و انتخاب‌های بعدی در صفحه تحلیل در دسترس‌اند.{% else %}✅ مورد حل‌نشده‌ای باقی نمانده است. می‌توانید از صفحه تحلیل گزارش را تولید کنید یا قبل از آن مدارک را مرور کنید.{% endif %}</div><a class="analysis-link" href="{% url 'portal:analysis-overview' case.case_code %}">مشاهده جزئیات و انتخاب اقدام بعدی ←</a></section>{% elif case.lifecycle_status == 'active' %}<section class="analysis"><h2>🧠 تحلیل پرونده</h2><div class="lead">این پرونده می‌تواند فقط به‌عنوان مخزن مدارک باقی بماند. هر زمان نیاز داشتید، تحلیل را جداگانه شروع کنید.</div><a class="analysis-link" href="{% url 'portal:analysis-overview' case.case_code %}">رفتن به تحلیل پرونده ←</a></section>{% endif %}
+  <div class="summary"><div class="stat"><span class="muted">همه موارد</span><b>{{ counts.all }}</b></div><div class="stat"><span class="muted">صوت‌ها</span><b>{{ counts.audio }}</b></div><div class="stat"><span class="muted">تصاویر</span><b>{{ counts.image }}</b></div><div class="stat"><span class="muted">مدارک</span><b>{{ counts.document }}</b></div><div class="stat"><span class="muted">یادداشت‌ها</span><b>{{ counts.note }}</b></div></div>
+  <div class="tabs"><a class="tab {% if kind == 'all' %}active{% endif %}" href="?type=all">همه</a><a class="tab {% if kind == 'audio' %}active{% endif %}" href="?type=audio">🎙 صوت</a><a class="tab {% if kind == 'image' %}active{% endif %}" href="?type=image">🖼 تصویر</a><a class="tab {% if kind == 'document' %}active{% endif %}" href="?type=document">📄 مدرک</a><a class="tab {% if kind == 'note' %}active{% endif %}" href="?type=note">💬 یادداشت</a></div>
+  {% for row in rows %}<article class="card"><div class="row"><div><div class="kind">{% if row.message.message_type == 'voice' or row.message.message_type == 'audio' %}🎙 فایل صوتی{% elif row.message.message_type == 'image' %}🖼 تصویر{% elif row.message.message_type == 'document' %}📄 مدرک{% elif row.message.message_type == 'text' %}💬 یادداشت{% else %}📌 محتوای پرونده{% endif %}</div><div class="meta">{{ row.message.sent_at|default:row.message.received_at|jalali_datetime }}</div></div><span class="badge">ذخیره‌شده</span></div>{% if row.message.text %}<div class="text">{{ row.message.text }}</div>{% endif %}{% if row.attachment %}<div class="file"><span>{{ row.attachment.original_name|default:'فایل پیوست' }}</span><span class="muted">{% if row.attachment.actual_size %}{{ row.attachment.actual_size|filesizeformat }}{% endif %}</span>{% if row.attachment.status == 'stored' %}<a href="{% url 'portal:download-attachment' case.case_code row.attachment.id %}">⬇️ دانلود امن</a>{% else %}<span class="muted">در حال پردازش</span>{% endif %}</div>{% endif %}{% if row.transcript %}<div class="transcript"><strong>📝 متن استخراج‌شده از صوت</strong><div class="text">{{ row.transcript.text }}</div></div>{% endif %}</article>{% empty %}<div class="empty">در این بخش هنوز محتوایی ثبت نشده است.</div>{% endfor %}
 </div>
 </body>
 </html>
