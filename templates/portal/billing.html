@@ -28,9 +28,9 @@
         {% endif %}
       </section>
       <section class="card">
-        <h2>وضعیت پرداخت آنلاین</h2>
+        <h2>پرداخت از طریق بله</h2>
         <p class="muted">ارائه‌دهنده تنظیم‌شده: <strong>{{ payment_provider_label }}</strong></p>
-        {% if online_payment_enabled and merchant_configured %}<div class="notice ready">✅ تنظیمات مدیریتی پرداخت آنلاین فعال شده است؛ با این حال تا زمان اضافه‌شدن endpointهای پرداخت و verify در نویسه، هیچ عملیات مالی از این صفحه انجام نمی‌شود.</div>{% elif online_payment_enabled %}<div class="notice">⚠️ پرداخت آنلاین در Admin فعال است اما Merchant ارائه‌دهنده هنوز تنظیم نشده؛ پرداخت از پنل قابل انجام نیست.</div>{% else %}<div class="notice disabled">💡 {{ billing_notice }}<br>فعال‌سازی خرید/تمدید فقط بعد از تکمیل اتصال امن درگاه انجام خواهد شد.</div>{% endif %}
+        {% if online_payment_enabled and payment_token_configured %}<div class="notice ready">✅ توکن پرداخت کیف پول بله در Admin تنظیم شده و پرداخت آنلاین فعال است. در مرحله اتصال کامل، درخواست خرید یا تمدید با صورتحساب بله داخل همان گفتگو انجام می‌شود.</div>{% elif online_payment_enabled %}<div class="notice">⚠️ پرداخت آنلاین در Admin فعال است اما Bale Payment Token هنوز تنظیم نشده است؛ هیچ درخواست پرداختی نباید صادر شود.</div>{% else %}<div class="notice disabled">💡 {{ billing_notice }}<br>توکن پرداخت بله از Admin به‌صورت رمزنگاری‌شده نگهداری می‌شود و فعال‌سازی نهایی پس از تکمیل جریان صورتحساب و تأیید پرداخت انجام خواهد شد.</div>{% endif %}
       </section>
     </div>
 
