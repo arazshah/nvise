@@ -53,12 +53,44 @@ def collect_case_evidence(case: Case) -> list[dict[str, Any]]:
 
 
 @transaction.atomic
+def start_extraction(*, case: Case, schema: FieldSchema) -> ExtractionRun:
+    run = ExtractionRun.objects.create(
+        case=case,
+        schema=schema,
+        provider="pending",
+        status=ExtractionRun.Status.PENDING,
+    )
+    case.vertical_key = schema.sub_vertical.vertical.key
+    case.sub_vertical_key = schema.sub_vertical.key
+    case.save(update_fields=["vertical_key", "sub_vertical_key", "updated_at"])
+    from .tasks import extract_case_facts
+
+    transaction.on_commit(lambda: extract_case_facts.delay(str(run.id)))
+    return run
+
+
+def supplemental_questions(case: Case) -> list[str]:
+    questions = []
+    issues = (
+        case.field_issues.filter(status=CaseFieldIssue.Status.OPEN)
+        .select_related("field")
+        .order_by("field__sequence", "created_at")
+    )
+    for issue in issues:
+        if issue.issue_type == CaseFieldIssue.IssueType.MISSING:
+            questions.append(f"لطفاً «{issue.field.label}» را مشخص کنید.")
+        elif issue.issue_type == CaseFieldIssue.IssueType.CONFLICT:
+            questions.append(f"برای «{issue.field.label}» اطلاعات متناقض ثبت شده؛ لطفاً مقدار صحیح را تأیید کنید.")
+        else:
+            questions.append(f"لطفاً مقدار معتبر برای «{issue.field.label}» ارائه کنید.")
+    return questions
+
+
+@transaction.atomic
 def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -> ExtractionRun:
     run = ExtractionRun.objects.select_for_update().select_related("schema").get(pk=run.pk)
     field_map = {field.key: field for field in run.schema.fields.all()}
-    evidence_map = {
-        str(item.id): item for item in Evidence.objects.filter(case=run.case)
-    }
+    evidence_map = {str(item.id): item for item in Evidence.objects.filter(case=run.case)}
 
     ExtractedFact.objects.filter(extraction_run=run).delete()
     CaseFieldIssue.objects.filter(case=run.case, status=CaseFieldIssue.Status.OPEN).delete()
