@@ -4,14 +4,41 @@ services:
     command: >-
       gunicorn config.wsgi:application
       --bind 0.0.0.0:8000
-      --workers 3
-      --threads 2
-      --timeout 120
+      --workers ${GUNICORN_WORKERS:-3}
+      --threads ${GUNICORN_THREADS:-2}
+      --timeout ${GUNICORN_TIMEOUT:-120}
       --access-logfile -
       --error-logfile -
-    env_file: .env
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-nvise.ir,www.nvise.ir}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      WEB_BASE_URL: ${WEB_BASE_URL:-https://nvise.ir}
+      REVIEW_LINK_TTL_MINUTES: ${REVIEW_LINK_TTL_MINUTES:-15}
+      BALE_BOT_TOKEN: ${BALE_BOT_TOKEN:?BALE_BOT_TOKEN is required}
+      BALE_BOT_ID: ${BALE_BOT_ID:-primary}
+      BALE_WEBHOOK_SECRET: ${BALE_WEBHOOK_SECRET:?BALE_WEBHOOK_SECRET is required}
+      BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE: ${BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE:-120}
+      MAX_WEBHOOK_BODY_BYTES: ${MAX_WEBHOOK_BODY_BYTES:-1048576}
+      PRIVATE_MEDIA_ROOT: /app/private_media
+      MAX_PROVIDER_FILE_BYTES: ${MAX_PROVIDER_FILE_BYTES:-20971520}
+      STT_PROVIDER: ${STT_PROVIDER:-http}
+      STT_HTTP_ENDPOINT: ${STT_HTTP_ENDPOINT:?STT_HTTP_ENDPOINT is required}
+      STT_API_KEY: ${STT_API_KEY:-}
+      STT_TIMEOUT_SECONDS: ${STT_TIMEOUT_SECONDS:-120}
+      AI_EXTRACTION_PROVIDER: ${AI_EXTRACTION_PROVIDER:-http}
+      AI_EXTRACTION_ENDPOINT: ${AI_EXTRACTION_ENDPOINT:?AI_EXTRACTION_ENDPOINT is required}
+      AI_EXTRACTION_API_KEY: ${AI_EXTRACTION_API_KEY:-}
+      AI_EXTRACTION_TIMEOUT_SECONDS: ${AI_EXTRACTION_TIMEOUT_SECONDS:-120}
+      CELERY_TASK_TIME_LIMIT: ${CELERY_TASK_TIME_LIMIT:-300}
+      CELERY_TASK_SOFT_TIME_LIMIT: ${CELERY_TASK_SOFT_TIME_LIMIT:-270}
+    expose:
+      - "8000"
     restart: unless-stopped
     volumes:
       - private_media:/app/private_media
@@ -29,10 +56,35 @@ services:
 
   worker:
     build: .
-    command: celery -A config worker -l info --concurrency=2
-    env_file: .env
+    command: celery -A config worker -l info --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-nvise.ir,www.nvise.ir}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      WEB_BASE_URL: ${WEB_BASE_URL:-https://nvise.ir}
+      REVIEW_LINK_TTL_MINUTES: ${REVIEW_LINK_TTL_MINUTES:-15}
+      BALE_BOT_TOKEN: ${BALE_BOT_TOKEN:?BALE_BOT_TOKEN is required}
+      BALE_BOT_ID: ${BALE_BOT_ID:-primary}
+      BALE_WEBHOOK_SECRET: ${BALE_WEBHOOK_SECRET:?BALE_WEBHOOK_SECRET is required}
+      BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE: ${BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE:-120}
+      MAX_WEBHOOK_BODY_BYTES: ${MAX_WEBHOOK_BODY_BYTES:-1048576}
+      PRIVATE_MEDIA_ROOT: /app/private_media
+      MAX_PROVIDER_FILE_BYTES: ${MAX_PROVIDER_FILE_BYTES:-20971520}
+      STT_PROVIDER: ${STT_PROVIDER:-http}
+      STT_HTTP_ENDPOINT: ${STT_HTTP_ENDPOINT:?STT_HTTP_ENDPOINT is required}
+      STT_API_KEY: ${STT_API_KEY:-}
+      STT_TIMEOUT_SECONDS: ${STT_TIMEOUT_SECONDS:-120}
+      AI_EXTRACTION_PROVIDER: ${AI_EXTRACTION_PROVIDER:-http}
+      AI_EXTRACTION_ENDPOINT: ${AI_EXTRACTION_ENDPOINT:?AI_EXTRACTION_ENDPOINT is required}
+      AI_EXTRACTION_API_KEY: ${AI_EXTRACTION_API_KEY:-}
+      AI_EXTRACTION_TIMEOUT_SECONDS: ${AI_EXTRACTION_TIMEOUT_SECONDS:-120}
+      CELERY_TASK_TIME_LIMIT: ${CELERY_TASK_TIME_LIMIT:-300}
+      CELERY_TASK_SOFT_TIME_LIMIT: ${CELERY_TASK_SOFT_TIME_LIMIT:-270}
     restart: unless-stopped
     volumes:
       - private_media:/app/private_media
