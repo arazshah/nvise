@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.transcription",
     "apps.evidence",
     "apps.intelligence",
+    "apps.reports",
 ]
 
 MIDDLEWARE = [
