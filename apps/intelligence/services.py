@@ -77,6 +77,10 @@ def _comparison_value(payload: dict[str, Any]) -> str:
     return repr(candidate)
 
 
+def _display_value(payload: dict[str, Any]) -> Any:
+    return payload.get("normalized_value", payload.get("value"))
+
+
 @transaction.atomic
 def start_extraction(*, case: Case, schema: FieldSchema) -> ExtractionRun:
     run = ExtractionRun.objects.create(
@@ -172,6 +176,7 @@ def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -
     generated_keys: set[tuple[str, str]] = set()
     seen_fields: set[str] = set()
     values_by_field: dict[str, set[str]] = defaultdict(set)
+    display_values_by_field: dict[str, list[Any]] = defaultdict(list)
 
     for payload in response.get("facts", []):
         key = payload.get("field")
@@ -191,7 +196,11 @@ def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -
             )
             continue
 
-        values_by_field[key].add(_comparison_value(payload))
+        comparison = _comparison_value(payload)
+        values_by_field[key].add(comparison)
+        display_value = _display_value(payload)
+        if display_value not in display_values_by_field[key]:
+            display_values_by_field[key].append(display_value)
         fact = ExtractedFact.objects.create(
             case=run.case,
             field=field,
@@ -211,7 +220,10 @@ def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -
                 case=run.case,
                 field=field,
                 issue_type=CaseFieldIssue.IssueType.MISSING,
-                details={"reason": "required_field_not_extracted"},
+                details={
+                    "reason": "required_field_not_extracted",
+                    "explanation": "این مورد در شواهد فعلی پرونده پیدا نشد.",
+                },
                 generated_keys=generated_keys,
                 terminal_field_ids=terminal_field_ids,
             )
@@ -226,11 +238,14 @@ def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -
 
     for key in conflict_keys:
         field = field_map[key]
+        details = dict(conflict_details.get(key) or {})
+        details.setdefault("reason", "multiple_distinct_values_extracted")
+        details.setdefault("values", display_values_by_field.get(key, []))
         _upsert_issue(
             case=run.case,
             field=field,
             issue_type=CaseFieldIssue.IssueType.CONFLICT,
-            details=conflict_details.get(key, {"reason": "multiple_distinct_values_extracted"}),
+            details=details,
             generated_keys=generated_keys,
             terminal_field_ids=terminal_field_ids,
         )
