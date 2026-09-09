@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from apps.tenants.models import Tenant
 
-from .models import Plan, Subscription, UsageRecord
+from .models import Entitlement, Plan, Subscription, UsageRecord
 
 
 class QuotaExceededError(PermissionError):
@@ -59,18 +59,72 @@ def ensure_default_plans() -> dict[str, Plan]:
 
 @transaction.atomic
 def get_or_create_subscription(tenant: Tenant) -> Subscription:
-    subscription = Subscription.objects.select_for_update().filter(tenant=tenant).first()
+    locked_tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+    subscription = Subscription.objects.select_for_update().filter(tenant=locked_tenant).first()
     if subscription is not None:
         return subscription
     free = ensure_default_plans()["free"]
     now = timezone.now()
     return Subscription.objects.create(
-        tenant=tenant,
+        tenant=locked_tenant,
         plan=free,
         status=Subscription.Status.ACTIVE,
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
     )
+
+
+@transaction.atomic
+def change_plan(*, tenant: Tenant, plan: Plan) -> Subscription:
+    subscription = get_or_create_subscription(tenant)
+    subscription = Subscription.objects.select_for_update().get(pk=subscription.pk)
+    subscription.plan = plan
+    subscription.status = Subscription.Status.ACTIVE
+    subscription.save(update_fields=["plan", "status", "updated_at"])
+    return subscription
+
+
+@transaction.atomic
+def renew_subscription_period(*, tenant: Tenant, days: int = 30) -> Subscription:
+    subscription = get_or_create_subscription(tenant)
+    subscription = Subscription.objects.select_for_update().get(pk=subscription.pk)
+    now = timezone.now()
+    subscription.current_period_start = now
+    subscription.current_period_end = now + timedelta(days=days)
+    subscription.status = Subscription.Status.ACTIVE
+    subscription.cancel_at_period_end = False
+    subscription.save(
+        update_fields=[
+            "current_period_start",
+            "current_period_end",
+            "status",
+            "cancel_at_period_end",
+            "updated_at",
+        ]
+    )
+    return subscription
+
+
+@transaction.atomic
+def set_subscription_status(*, tenant: Tenant, status: str) -> Subscription:
+    if status not in Subscription.Status.values:
+        raise ValueError("Invalid subscription status")
+    subscription = get_or_create_subscription(tenant)
+    subscription = Subscription.objects.select_for_update().get(pk=subscription.pk)
+    subscription.status = status
+    subscription.save(update_fields=["status", "updated_at"])
+    return subscription
+
+
+@transaction.atomic
+def set_entitlement(*, tenant: Tenant, key: str, value, source=Entitlement.Source.OVERRIDE):
+    subscription = get_or_create_subscription(tenant)
+    entitlement, _ = Entitlement.objects.update_or_create(
+        subscription=subscription,
+        key=key,
+        defaults={"value": value, "source": source},
+    )
+    return entitlement
 
 
 def _active_subscription(tenant: Tenant) -> Subscription:
