@@ -4,17 +4,18 @@ from django.db.models import Q
 
 from apps.cases.models import Case
 from apps.intelligence.models import ExtractionRun
-from apps.intelligence.tasks import extract_case_facts
+from apps.intelligence.tasks import dispatch_follow_up, extract_case_facts
 from apps.processing.models import ProcessingJob
 from apps.transcription.tasks import transcribe_audio
 
 
 class Command(BaseCommand):
-    help = "Requeue recoverable audio jobs and stalled finalization extraction runs."
+    help = "Requeue recoverable processing and pending Bale follow-up delivery."
 
     def handle(self, *args, **options):
         requeued_audio = 0
         requeued_extractions = 0
+        requeued_followups = 0
 
         recoverable_errors = Q(
             last_error__icontains="FOR UPDATE cannot be applied to the nullable side of an outer join"
@@ -77,8 +78,18 @@ class Command(BaseCommand):
                 extract_case_facts.delay(str(run.id))
                 requeued_extractions += 1
 
+        pending_followup_cases = Case.objects.filter(
+            status=Case.Status.NEEDS_INFORMATION,
+            follow_up_questions__status__in=["pending", "asked"],
+        ).distinct()
+        for case in pending_followup_cases:
+            dispatch_follow_up.delay(str(case.id))
+            requeued_followups += 1
+
         self.stdout.write(
             self.style.SUCCESS(
-                f"Recovery queued: audio={requeued_audio}, extraction={requeued_extractions}"
+                "Recovery queued: "
+                f"audio={requeued_audio}, extraction={requeued_extractions}, "
+                f"followup={requeued_followups}"
             )
         )
