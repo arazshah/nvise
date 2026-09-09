@@ -1,3 +1,4 @@
+{% load jalali_tags %}
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
@@ -21,7 +22,7 @@
     {% if active_cases %}<div class="grid">
       {% for case in active_cases %}<div class="card">
         <div class="title">{{ case.title|default:'بدون عنوان' }}</div>
-        <div class="meta">کد: {{ case.case_code }}<br>آخرین تغییر: {{ case.updated_at|date:'Y/m/d H:i' }}</div>
+        <div class="meta">کد: {{ case.case_code }}<br>آخرین تغییر: {{ case.updated_at|jalali_datetime }}</div>
         <span class="badge">فعال</span><br>
         <a class="btn" href="{% url 'portal:case-repository' case.case_code %}">باز کردن پرونده</a>
       </div>{% endfor %}
@@ -33,7 +34,7 @@
     {% if archived_cases %}<div class="grid">
       {% for case in archived_cases %}<div class="card">
         <div class="title">{{ case.title|default:'بدون عنوان' }}</div>
-        <div class="meta">کد: {{ case.case_code }}<br>تاریخ بایگانی: {{ case.archived_at|date:'Y/m/d H:i' }}</div>
+        <div class="meta">کد: {{ case.case_code }}<br>تاریخ بایگانی: {{ case.archived_at|jalali_datetime }}</div>
         <span class="badge archive">بایگانی‌شده</span><br>
         <a class="btn" href="{% url 'portal:case-repository' case.case_code %}">مشاهده مخزن</a>
       </div>{% endfor %}
