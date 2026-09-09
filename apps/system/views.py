@@ -12,6 +12,19 @@ from django.utils import timezone
 from apps.subscriptions.models import Subscription, UsageRecord
 from apps.tenants.models import Tenant
 
+from .models import IntegrationSettings
+
+
+def home(request):
+    integration = IntegrationSettings.objects.filter(pk=1).first()
+    return render(
+        request,
+        "system/home.html",
+        {
+            "bale_public_url": integration.bale_public_url if integration else "",
+        },
+    )
+
 
 def health(_request):
     return JsonResponse({"status": "ok", "service": "nvise"})
