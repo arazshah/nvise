@@ -67,6 +67,9 @@ class ProcessingJob(models.Model):
         indexes = [
             models.Index(fields=["status", "available_at", "priority"], name="proc_job_queue_idx")
         ]
+        constraints = [
+            models.UniqueConstraint(fields=["attachment", "job_type"], name="uniq_attachment_job_type")
+        ]
 
 
 class ProcessingAttempt(models.Model):
