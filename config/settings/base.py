@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.documents",
     "apps.portal",
     "apps.subscriptions",
+    "apps.system",
 ]
 
 MIDDLEWARE = [
