@@ -1,9 +1,13 @@
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
 
 from ..base import MessagingProvider
 from ..schemas import NormalizedFile, NormalizedMessage, NormalizedUpdate
 from .client import BaleClient
+
+
+PORTAL_LOGIN_LABEL = "🌐 ورود به پنل نویسه"
 
 
 class BaleProvider(MessagingProvider):
@@ -90,13 +94,33 @@ class BaleProvider(MessagingProvider):
             file_size=payload.get("file_size"),
         )
 
+    @staticmethod
+    def _with_portal_button(keyboard: dict | None) -> dict | None:
+        if not keyboard or keyboard.get("one_time_keyboard"):
+            return keyboard
+        rows = deepcopy(keyboard.get("keyboard") or [])
+        if not any(
+            button.get("text") == PORTAL_LOGIN_LABEL
+            for row in rows
+            for button in row
+            if isinstance(button, dict)
+        ):
+            rows.append([{"text": PORTAL_LOGIN_LABEL}])
+        result = deepcopy(keyboard)
+        result["keyboard"] = rows
+        return result
+
     def _require_client(self) -> BaleClient:
         if self.client is None:
             raise RuntimeError("Bale provider requires a token for outbound API calls")
         return self.client
 
     async def send_text(self, chat_id: str, text: str, keyboard: dict | None = None) -> dict:
-        return await self._require_client().send_message(chat_id, text, keyboard)
+        return await self._require_client().send_message(
+            chat_id,
+            text,
+            self._with_portal_button(keyboard),
+        )
 
     async def send_document(
         self,
