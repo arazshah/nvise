@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ case.title|default:case.case_code }} | نویسه</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif}.wrap{max-width:1180px;margin:0 auto;padding:26px 18px}.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.head h1{margin:0 0 6px;font-size:28px}.muted{color:#667085}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:10px;padding:10px 14px;background:#172033;color:#fff;text-decoration:none;cursor:pointer;font-family:inherit}.btn.secondary{background:#eef2ff;color:#1e293b}.btn.warn{background:#92400e}.btn.success{background:#166534}.summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:22px 0}.stat{background:#fff;border:1px solid #e8ecf4;border-radius:16px;padding:15px}.stat b{display:block;font-size:22px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.tab{padding:9px 12px;border-radius:999px;text-decoration:none;background:#fff;color:#334155;border:1px solid #e1e6ef}.tab.active{background:#172033;color:#fff}.card{background:#fff;border:1px solid #e8ecf4;border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 8px 26px rgba(21,36,72,.04)}.row{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.kind{font-weight:800}.meta{font-size:12px;color:#667085;margin-top:5px}.text{white-space:pre-wrap;line-height:1.9;margin-top:12px}.transcript{margin-top:12px;background:#f8fafc;border-right:3px solid #6366f1;padding:12px;border-radius:10px}.file{margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.file a{font-size:13px;text-decoration:none;color:#1d4ed8}.badge{padding:5px 9px;border-radius:999px;background:#eef2ff;font-size:12px}.archive{background:#fff7ed;border:1px solid #fed7aa;border-radius:15px;padding:14px;margin:16px 0}.empty{background:#fff;border:1px dashed #cbd5e1;border-radius:16px;padding:28px;color:#667085;text-align:center}@media(max-width:850px){.summary{grid-template-columns:repeat(2,1fr)}.top,.row{flex-direction:column}.actions{width:100%}}@media(max-width:520px){.summary{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="head"><div class="muted">📁 مخزن پرونده</div><h1>{{ case.title|default:'بدون عنوان' }}</h1><div class="muted">{{ case.case_code }}</div></div>
+    <div class="actions">
+      <a class="btn secondary" href="{% url 'portal:case-list' %}">همه پرونده‌ها</a>
+      {% if report and report.current_revision_id %}<a class="btn" href="{% url 'portal:case-review' case.case_code %}">مشاهده گزارش</a>{% endif %}
+      {% if case.lifecycle_status == 'active' %}
+      <form method="post" action="{% url 'portal:archive-case' case.case_code %}">{% csrf_token %}<button class="btn warn" type="submit">📦 بایگانی پرونده</button></form>
+      {% elif case.lifecycle_status == 'archived' %}
+      <form method="post" action="{% url 'portal:reopen-case' case.case_code %}">{% csrf_token %}<button class="btn success" type="submit">🔓 بازگشایی پرونده</button></form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if case.lifecycle_status == 'archived' %}<div class="archive">📦 این پرونده بایگانی شده است. همه محتوا و مدارک آن محفوظ مانده و در هر زمان می‌توانید آن را بازگشایی کنید.</div>{% endif %}
+
+  <div class="summary">
+    <div class="stat"><span class="muted">همه موارد</span><b>{{ counts.all }}</b></div>
+    <div class="stat"><span class="muted">صوت‌ها</span><b>{{ counts.audio }}</b></div>
+    <div class="stat"><span class="muted">تصاویر</span><b>{{ counts.image }}</b></div>
+    <div class="stat"><span class="muted">مدارک</span><b>{{ counts.document }}</b></div>
+    <div class="stat"><span class="muted">یادداشت‌ها</span><b>{{ counts.note }}</b></div>
+  </div>
+
+  <div class="tabs">
+    <a class="tab {% if kind == 'all' %}active{% endif %}" href="?type=all">همه</a>
+    <a class="tab {% if kind == 'audio' %}active{% endif %}" href="?type=audio">🎙 صوت</a>
+    <a class="tab {% if kind == 'image' %}active{% endif %}" href="?type=image">🖼 تصویر</a>
+    <a class="tab {% if kind == 'document' %}active{% endif %}" href="?type=document">📄 مدرک</a>
+    <a class="tab {% if kind == 'note' %}active{% endif %}" href="?type=note">💬 یادداشت</a>
+  </div>
+
+  {% for row in rows %}<article class="card"><div class="row"><div>
+    <div class="kind">{% if row.message.message_type == 'voice' or row.message.message_type == 'audio' %}🎙 فایل صوتی{% elif row.message.message_type == 'image' %}🖼 تصویر{% elif row.message.message_type == 'document' %}📄 مدرک{% elif row.message.message_type == 'text' %}💬 یادداشت{% else %}📌 محتوای پرونده{% endif %}</div>
+    <div class="meta">{{ row.message.sent_at|default:row.message.received_at|date:'Y/m/d H:i' }}</div>
+  </div><span class="badge">ذخیره‌شده</span></div>
+  {% if row.message.text %}<div class="text">{{ row.message.text }}</div>{% endif %}
+  {% if row.attachment %}<div class="file"><span>{{ row.attachment.original_name|default:'فایل پیوست' }}</span><span class="muted">{% if row.attachment.actual_size %}{{ row.attachment.actual_size|filesizeformat }}{% endif %}</span>{% if row.attachment.status == 'stored' %}<a href="{% url 'portal:download-attachment' case.case_code row.attachment.id %}">⬇️ دانلود امن</a>{% else %}<span class="muted">در حال پردازش</span>{% endif %}</div>{% endif %}
+  {% if row.transcript %}<div class="transcript"><strong>📝 متن استخراج‌شده از صوت</strong><div class="text">{{ row.transcript.text }}</div></div>{% endif %}
+  </article>{% empty %}<div class="empty">در این بخش هنوز محتوایی ثبت نشده است.</div>{% endfor %}
+</div>
+</body>
+</html>
