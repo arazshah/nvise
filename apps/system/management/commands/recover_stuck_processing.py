@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.db.models import Q
 
 from apps.cases.models import Case
 from apps.intelligence.models import ExtractionRun
@@ -15,14 +16,21 @@ class Command(BaseCommand):
         requeued_audio = 0
         requeued_extractions = 0
 
-        recoverable_error = "FOR UPDATE cannot be applied to the nullable side of an outer join"
-        failed_jobs = ProcessingJob.objects.filter(
-            job_type=ProcessingJob.JobType.TRANSCRIBE_AUDIO,
-            status=ProcessingJob.Status.FAILED,
-            attachment__storage_key__gt="",
-            attachment__message__case__status=Case.Status.FINALIZING,
-            last_error__icontains=recoverable_error,
-        ).select_related("attachment__message__case")
+        recoverable_errors = Q(
+            last_error__icontains="FOR UPDATE cannot be applied to the nullable side of an outer join"
+        ) | Q(last_error__icontains="400 Bad Request") | Q(
+            last_error__icontains="AvalAI STT returned HTTP 400"
+        )
+        failed_jobs = (
+            ProcessingJob.objects.filter(
+                job_type=ProcessingJob.JobType.TRANSCRIBE_AUDIO,
+                status=ProcessingJob.Status.FAILED,
+                attachment__storage_key__gt="",
+                attachment__message__case__status=Case.Status.FINALIZING,
+            )
+            .filter(recoverable_errors)
+            .select_related("attachment__message__case")
+        )
 
         for job in failed_jobs:
             with transaction.atomic():
@@ -47,6 +55,14 @@ class Command(BaseCommand):
                 status__in=[ProcessingJob.Status.PENDING, ProcessingJob.Status.RUNNING],
             ).exists()
             if has_pending_audio:
+                continue
+
+            has_failed_audio = ProcessingJob.objects.filter(
+                attachment__message__case=case,
+                job_type=ProcessingJob.JobType.TRANSCRIBE_AUDIO,
+                status=ProcessingJob.Status.FAILED,
+            ).exists()
+            if has_failed_audio:
                 continue
 
             run = (
