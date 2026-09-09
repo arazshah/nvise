@@ -37,8 +37,9 @@ def test_case_lifecycle_creates_audit_events():
     finish_input(case=case, actor=user)
 
     assert AuditEvent.objects.filter(case=case, event_type="case.created").exists()
-    transition = AuditEvent.objects.filter(case=case, event_type="case.status_changed").latest("created_at")
-    assert transition.metadata["to"] == "finalizing"
+    analysis = AuditEvent.objects.filter(case=case, event_type="case.analysis_requested").latest("created_at")
+    assert analysis.metadata["from"] == "not_started"
+    assert analysis.metadata["to"] == "queued"
 
 
 @pytest.mark.django_db
