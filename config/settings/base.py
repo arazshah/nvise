@@ -20,6 +20,7 @@ if env_file.exists():
     environ.Env.read_env(env_file)
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="unsafe-dev-key")
+NVISE_CONFIG_ENCRYPTION_KEY = env("NVISE_CONFIG_ENCRYPTION_KEY", default="")
 DEBUG = env("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
