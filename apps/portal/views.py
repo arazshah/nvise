@@ -2,6 +2,7 @@ from io import BytesIO
 
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
@@ -22,6 +23,14 @@ from .services import (
     get_portal_access_token,
     user_can_review_case,
 )
+
+
+def _accessible_cases(user):
+    return Case.objects.filter(
+        tenant__memberships__user=user,
+        tenant__memberships__is_active=True,
+        tenant__is_active=True,
+    ).distinct()
 
 
 def _accessible_case(user, case_code: str) -> Case:
@@ -65,7 +74,7 @@ def portal_access(request, token: str):
 
     login(request, consumed.user, backend="django.contrib.auth.backends.ModelBackend")
     request.session.cycle_key()
-    return redirect("portal:case-list")
+    return redirect("portal:dashboard")
 
 
 @require_http_methods(["GET", "POST"])
@@ -88,16 +97,56 @@ def review_access(request, token: str):
 
 @login_required
 @require_http_methods(["GET"])
-def case_list(request):
-    cases = (
-        Case.objects.filter(
-            tenant__memberships__user=request.user,
-            tenant__memberships__is_active=True,
-            tenant__is_active=True,
-        )
-        .distinct()
-        .order_by("-updated_at")
+def dashboard(request):
+    cases = _accessible_cases(request.user).annotate(
+        open_issue_count=Count(
+            "field_issues",
+            filter=Q(field_issues__status="open"),
+            distinct=True,
+        ),
+        message_count=Count("messages", distinct=True),
     )
+
+    active_count = cases.filter(lifecycle_status=Case.LifecycleStatus.ACTIVE).count()
+    archived_count = cases.filter(lifecycle_status=Case.LifecycleStatus.ARCHIVED).count()
+    needs_action_count = cases.filter(
+        Q(analysis_status__in=[Case.AnalysisStatus.NEEDS_REVIEW, Case.AnalysisStatus.FAILED])
+        | Q(report_status=Case.ReportStatus.READY_FOR_REVIEW)
+    ).count()
+    reports_ready_count = cases.filter(
+        report_status__in=[Case.ReportStatus.READY_FOR_REVIEW, Case.ReportStatus.APPROVED]
+    ).count()
+
+    recent_cases = list(cases.order_by("-updated_at")[:6])
+    action_cases = list(
+        cases.filter(
+            Q(analysis_status__in=[Case.AnalysisStatus.NEEDS_REVIEW, Case.AnalysisStatus.FAILED])
+            | Q(report_status=Case.ReportStatus.READY_FOR_REVIEW)
+        )
+        .order_by("-updated_at")[:5]
+    )
+
+    display_name = getattr(request.user, "display_name", "") or request.user.get_username()
+    return render(
+        request,
+        "portal/dashboard.html",
+        {
+            "display_name": display_name,
+            "total_count": cases.count(),
+            "active_count": active_count,
+            "archived_count": archived_count,
+            "needs_action_count": needs_action_count,
+            "reports_ready_count": reports_ready_count,
+            "recent_cases": recent_cases,
+            "action_cases": action_cases,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def case_list(request):
+    cases = _accessible_cases(request.user).order_by("-updated_at")
     active_cases = [case for case in cases if case.lifecycle_status == Case.LifecycleStatus.ACTIVE]
     archived_cases = [case for case in cases if case.lifecycle_status == Case.LifecycleStatus.ARCHIVED]
     return render(
