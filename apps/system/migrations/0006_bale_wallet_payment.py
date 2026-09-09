@@ -22,6 +22,14 @@ class Migration(migrations.Migration):
         migrations.RunPython(switch_existing_provider_to_bale, migrations.RunPython.noop),
         migrations.AlterField(
             model_name="integrationsettings",
+            name="online_payment_enabled",
+            field=models.BooleanField(
+                default=False,
+                help_text="فقط پس از تکمیل جریان sendInvoice و تأیید پرداخت بله فعال شود.",
+            ),
+        ),
+        migrations.AlterField(
+            model_name="integrationsettings",
             name="payment_provider",
             field=models.CharField(
                 choices=[("bale", "کیف پول بله")],
