@@ -7,6 +7,8 @@ from apps.cases.services import transition_case
 from apps.messaging.models import CaseMessage
 from apps.processing.models import ProcessingJob
 from apps.reports.services import generate_report_revision
+from apps.subscriptions.models import UsageRecord
+from apps.subscriptions.services import assert_quota, record_usage
 
 from .followups import ensure_follow_up_questions, send_next_follow_up
 from .models import CaseFieldIssue, ExtractionRun, FieldSchema
@@ -40,13 +42,14 @@ def extract_case_facts(self, run_id: str) -> None:
     with transaction.atomic():
         run = (
             ExtractionRun.objects.select_for_update()
-            .select_related("case", "schema__sub_vertical__vertical")
+            .select_related("case__tenant", "schema__sub_vertical__vertical")
             .get(pk=run_id)
         )
         if run.status == ExtractionRun.Status.COMPLETED:
             return
         if _audio_pipeline_pending(run.case):
             raise RuntimeError("Audio evidence is still being processed")
+        assert_quota(run.case.tenant, UsageRecord.Metric.AI_EXTRACTION, 1)
         run.status = ExtractionRun.Status.RUNNING
         run.error_message = ""
         run.save(update_fields=["status", "error_message"])
@@ -60,7 +63,7 @@ def extract_case_facts(self, run_id: str) -> None:
         payload = provider.extract(schema=serialize_schema(schema), evidence=evidence)
 
         with transaction.atomic():
-            run = ExtractionRun.objects.select_for_update().get(pk=run.pk)
+            run = ExtractionRun.objects.select_for_update().select_related("case__tenant").get(pk=run.pk)
             run.provider = provider.key
             run.model_name = str(payload.get("model") or "")[:128]
             run.input_snapshot = {
@@ -70,6 +73,14 @@ def extract_case_facts(self, run_id: str) -> None:
             }
             run.save(update_fields=["provider", "model_name", "input_snapshot"])
             apply_extraction_response(run=run, response=payload)
+            record_usage(
+                tenant=run.case.tenant,
+                metric=UsageRecord.Metric.AI_EXTRACTION,
+                quantity=1,
+                idempotency_key=f"ai-extraction:{run.id}",
+                case=run.case,
+                metadata={"provider": provider.key, "model": run.model_name},
+            )
 
         has_open_issues = CaseFieldIssue.objects.filter(
             case=run.case,
