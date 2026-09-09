@@ -1,48 +1,137 @@
 services:
   web:
-    build: .
-    command: python manage.py runserver 0.0.0.0:8000
-    env_file: .env
+    build:
+      context: .
+    command: >-
+      sh -c "python manage.py migrate --noinput &&
+      gunicorn config.wsgi:application
+      --bind 0.0.0.0:8000
+      --workers ${GUNICORN_WORKERS:-3}
+      --threads ${GUNICORN_THREADS:-2}
+      --timeout ${GUNICORN_TIMEOUT:-120}
+      --access-logfile -
+      --error-logfile -"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-nvise.ir,www.nvise.ir}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      WEB_BASE_URL: ${WEB_BASE_URL:-https://nvise.ir}
+      REVIEW_LINK_TTL_MINUTES: ${REVIEW_LINK_TTL_MINUTES:-15}
+      BALE_BOT_TOKEN: ${BALE_BOT_TOKEN:-}
+      BALE_BOT_ID: ${BALE_BOT_ID:-primary}
+      BALE_WEBHOOK_SECRET: ${BALE_WEBHOOK_SECRET}
+      BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE: ${BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE:-120}
+      MAX_WEBHOOK_BODY_BYTES: ${MAX_WEBHOOK_BODY_BYTES:-1048576}
+      PRIVATE_MEDIA_ROOT: /app/private_media
+      MAX_PROVIDER_FILE_BYTES: ${MAX_PROVIDER_FILE_BYTES:-20971520}
+      STT_PROVIDER: ${STT_PROVIDER:-http}
+      STT_HTTP_ENDPOINT: ${STT_HTTP_ENDPOINT:-}
+      STT_API_KEY: ${STT_API_KEY:-}
+      STT_TIMEOUT_SECONDS: ${STT_TIMEOUT_SECONDS:-120}
+      AI_EXTRACTION_PROVIDER: ${AI_EXTRACTION_PROVIDER:-http}
+      AI_EXTRACTION_ENDPOINT: ${AI_EXTRACTION_ENDPOINT:-}
+      AI_EXTRACTION_API_KEY: ${AI_EXTRACTION_API_KEY:-}
+      AI_EXTRACTION_TIMEOUT_SECONDS: ${AI_EXTRACTION_TIMEOUT_SECONDS:-120}
+      CELERY_TASK_TIME_LIMIT: ${CELERY_TASK_TIME_LIMIT:-300}
+      CELERY_TASK_SOFT_TIME_LIMIT: ${CELERY_TASK_SOFT_TIME_LIMIT:-270}
+    expose:
+      - "8000"
+    restart: unless-stopped
     volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
+      - private_media:/app/private_media
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready/', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   worker:
-    build: .
-    command: celery -A config worker -l info
-    env_file: .env
+    build:
+      context: .
+    command: celery -A config worker -l info --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-nvise.ir,www.nvise.ir}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+      WEB_BASE_URL: ${WEB_BASE_URL:-https://nvise.ir}
+      REVIEW_LINK_TTL_MINUTES: ${REVIEW_LINK_TTL_MINUTES:-15}
+      BALE_BOT_TOKEN: ${BALE_BOT_TOKEN:-}
+      BALE_BOT_ID: ${BALE_BOT_ID:-primary}
+      BALE_WEBHOOK_SECRET: ${BALE_WEBHOOK_SECRET}
+      PRIVATE_MEDIA_ROOT: /app/private_media
+      MAX_PROVIDER_FILE_BYTES: ${MAX_PROVIDER_FILE_BYTES:-20971520}
+      STT_PROVIDER: ${STT_PROVIDER:-http}
+      STT_HTTP_ENDPOINT: ${STT_HTTP_ENDPOINT:-}
+      STT_API_KEY: ${STT_API_KEY:-}
+      STT_TIMEOUT_SECONDS: ${STT_TIMEOUT_SECONDS:-120}
+      AI_EXTRACTION_PROVIDER: ${AI_EXTRACTION_PROVIDER:-http}
+      AI_EXTRACTION_ENDPOINT: ${AI_EXTRACTION_ENDPOINT:-}
+      AI_EXTRACTION_API_KEY: ${AI_EXTRACTION_API_KEY:-}
+      AI_EXTRACTION_TIMEOUT_SECONDS: ${AI_EXTRACTION_TIMEOUT_SECONDS:-120}
+      CELERY_TASK_TIME_LIMIT: ${CELERY_TASK_TIME_LIMIT:-300}
+      CELERY_TASK_SOFT_TIME_LIMIT: ${CELERY_TASK_SOFT_TIME_LIMIT:-270}
+    restart: unless-stopped
     volumes:
-      - .:/app
+      - private_media:/app/private_media
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: nvise
-      POSTGRES_USER: nvise
-      POSTGRES_PASSWORD: nvise
+      POSTGRES_DB: ${POSTGRES_DB:-nvise}
+      POSTGRES_USER: ${POSTGRES_USER:-nvise}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nvise -d nvise"]
+      test:
+        - CMD-SHELL
+        - "pg_isready -U ${POSTGRES_USER:-nvise} -d ${POSTGRES_DB:-nvise}"
       interval: 5s
       timeout: 5s
       retries: 10
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
     command: redis-server --appendonly yes
+    restart: unless-stopped
     volumes:
       - redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   postgres_data:
   redis_data:
+  private_media:
