@@ -19,6 +19,7 @@ from apps.subscriptions.services import (
     refresh_subscription_state,
 )
 from apps.system.integrations import get_bale_config
+from apps.system.jalali import format_jalali
 from apps.tenants.models import Tenant, TenantMembership
 from apps.tenants.services import MemberLimitExceededError, add_tenant_member
 
@@ -183,6 +184,7 @@ def _show_billing_summary(*, provider, user, message) -> None:
         if is_expired
         else ""
     )
+    period_end = format_jalali(timezone.localtime(subscription.current_period_end))
 
     text = (
         "💳 اشتراک و مصرف\n"
@@ -190,7 +192,7 @@ def _show_billing_summary(*, provider, user, message) -> None:
         f"🏢 حساب: {tenant.name}\n"
         f"📦 پلن: {plan.name}\n"
         f"✅ وضعیت: {status}\n"
-        f"📅 اعتبار تا: {subscription.current_period_end:%Y/%m/%d}"
+        f"📅 اعتبار تا: {period_end}"
         f"{trial_note}\n\n"
         "📊 مصرف دوره جاری\n"
         f"📁 پرونده: {cases} از {plan.max_cases_per_period}\n"
@@ -207,11 +209,12 @@ def _show_billing_summary(*, provider, user, message) -> None:
 def _handle_successful_payment(*, inbound, provider, message) -> None:
     attempt, subscription, activated = process_successful_payment(message.raw or {})
     if activated:
+        period_end = format_jalali(timezone.localtime(subscription.current_period_end))
         text = (
             "✅ پرداخت با موفقیت تأیید شد.\n\n"
             f"💳 پلن: {attempt.plan.name}\n"
             f"💰 مبلغ: {attempt.amount:,} ریال\n"
-            f"📅 اعتبار تا: {subscription.current_period_end:%Y/%m/%d}\n\n"
+            f"📅 اعتبار تا: {period_end}\n\n"
             "اشتراک نویسه برای حساب شما فعال/تمدید شد."
         )
     else:
