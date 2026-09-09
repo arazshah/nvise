@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import connection
 from django.db.models import Count, Q, Sum
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -13,6 +13,9 @@ from apps.subscriptions.models import Subscription, UsageRecord
 from apps.tenants.models import Tenant
 
 from .models import IntegrationSettings
+
+
+FAVICON_SVG = """<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><rect width=\"64\" height=\"64\" rx=\"16\" fill=\"#2c23a4\"/><path d=\"M18 16h20a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8h-8l-10 8 2-8h-4a8 8 0 0 1-8-8V24a8 8 0 0 1 8-8Z\" fill=\"white\"/><path d=\"M25 25h13M25 31h13M25 37h8\" stroke=\"#2c23a4\" stroke-width=\"3\" stroke-linecap=\"round\"/></svg>"""
 
 
 def home(request):
@@ -24,6 +27,10 @@ def home(request):
             "bale_public_url": integration.bale_public_url if integration else "",
         },
     )
+
+
+def favicon(_request):
+    return HttpResponse(FAVICON_SVG, content_type="image/svg+xml")
 
 
 def health(_request):
