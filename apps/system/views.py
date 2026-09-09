@@ -9,7 +9,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 
-from apps.subscriptions.models import Subscription, UsageRecord
+from apps.subscriptions.models import Plan, Subscription, UsageRecord
 from apps.tenants.models import Tenant
 
 from .models import IntegrationSettings
@@ -18,15 +18,30 @@ from .models import IntegrationSettings
 FAVICON_SVG = """<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><rect width=\"64\" height=\"64\" rx=\"16\" fill=\"#2c23a4\"/><path d=\"M18 16h20a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8h-8l-10 8 2-8h-4a8 8 0 0 1-8-8V24a8 8 0 0 1 8-8Z\" fill=\"white\"/><path d=\"M25 25h13M25 31h13M25 37h8\" stroke=\"#2c23a4\" stroke-width=\"3\" stroke-linecap=\"round\"/></svg>"""
 
 
-def home(request):
+def _public_context() -> dict:
     integration = IntegrationSettings.objects.filter(pk=1).first()
-    return render(
-        request,
-        "system/home.html",
-        {
-            "bale_public_url": integration.bale_public_url if integration else "",
-        },
-    )
+    return {
+        "integration": integration,
+        "bale_public_url": integration.bale_public_url if integration else "",
+        "creator_name": integration.creator_name if integration else "آراز شاه‌کرمی",
+        "creator_url": integration.creator_url if integration else "https://araz.me",
+        "support_email": integration.support_email if integration else "mail@araz.me",
+        "show_billing_portal": integration.show_billing_portal if integration else True,
+        "billing_notice": (
+            integration.billing_notice
+            if integration
+            else "پرداخت آنلاین به‌زودی از طریق زیبال فعال خواهد شد."
+        ),
+        "plans": Plan.objects.filter(is_active=True).order_by("monthly_price", "name"),
+    }
+
+
+def home(request):
+    return render(request, "system/home.html", _public_context())
+
+
+def guide(request):
+    return render(request, "system/guide.html", _public_context())
 
 
 def favicon(_request):
