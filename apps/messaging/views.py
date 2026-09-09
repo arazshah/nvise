@@ -3,10 +3,12 @@ import json
 from django.conf import settings
 from django.db import transaction
 from django.http import HttpRequest, JsonResponse
+from django.utils import timezone
 from django.utils.crypto import constant_time_compare
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
+from apps.subscriptions.payments import PaymentError, answer_precheckout
 from apps.system.integrations import get_bale_config
 from apps.system.rate_limit import allow_fixed_window
 
@@ -56,7 +58,21 @@ def bale_webhook(request: HttpRequest, secret: str) -> JsonResponse:
             external_update_id=normalized.update_id,
             defaults={"payload": payload},
         )
-        if created:
-            transaction.on_commit(lambda: process_bale_update.delay(str(inbound.id)))
+
+    precheckout = payload.get("pre_checkout_query")
+    if isinstance(precheckout, dict):
+        try:
+            approved = answer_precheckout(precheckout)
+        except PaymentError as exc:
+            inbound.processing_error = str(exc)[:2000]
+            inbound.save(update_fields=["processing_error"])
+            return JsonResponse({"ok": False, "error": "payment_precheckout_failed"}, status=503)
+        inbound.processed_at = timezone.now()
+        inbound.processing_error = ""
+        inbound.save(update_fields=["processed_at", "processing_error"])
+        return JsonResponse({"ok": True, "duplicate": not created, "payment_approved": approved})
+
+    if created:
+        transaction.on_commit(lambda: process_bale_update.delay(str(inbound.id)))
 
     return JsonResponse({"ok": True, "duplicate": not created})
