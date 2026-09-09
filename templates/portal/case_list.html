@@ -6,14 +6,14 @@
   <title>پرونده‌های من | نویسه</title>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
   <style>
-    *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif}.wrap{max-width:1120px;margin:0 auto;padding:28px 18px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.brand{font-size:28px;font-weight:800}.muted{color:#667085}.section{margin-top:28px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.card{background:#fff;border:1px solid #e8ecf4;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(21,36,72,.05)}.title{font-weight:800;font-size:17px;margin-bottom:8px}.meta{font-size:13px;color:#667085;line-height:1.9}.badge{display:inline-flex;padding:5px 10px;border-radius:999px;font-size:12px;background:#eef2ff;color:#334155;margin-top:10px}.badge.archive{background:#f1f5f9;color:#475569}.btn{display:inline-flex;text-decoration:none;background:#172033;color:#fff;padding:9px 14px;border-radius:10px;margin-top:14px;font-size:13px}.empty{background:#fff;border:1px dashed #cfd6e4;border-radius:16px;padding:24px;color:#667085}@media(max-width:850px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:560px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+    *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif}.wrap{max-width:1120px;margin:0 auto;padding:28px 18px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.brand{font-size:28px;font-weight:800}.muted{color:#667085}.section{margin-top:28px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.card{background:#fff;border:1px solid #e8ecf4;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(21,36,72,.05)}.title{font-weight:800;font-size:17px;margin-bottom:8px}.meta{font-size:13px;color:#667085;line-height:1.9}.badge{display:inline-flex;padding:5px 10px;border-radius:999px;font-size:12px;background:#eef2ff;color:#334155;margin-top:10px}.badge.archive{background:#f1f5f9;color:#475569}.btn{display:inline-flex;text-decoration:none;background:#172033;color:#fff;padding:9px 14px;border-radius:10px;margin-top:14px;font-size:13px}.toolbar{display:flex;gap:8px}.toolbar .btn{margin-top:0}.btn.secondary{background:#fff;color:#344054;border:1px solid #dfe5ef}.empty{background:#fff;border:1px dashed #cfd6e4;border-radius:16px;padding:24px;color:#667085}@media(max-width:850px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:560px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.toolbar{width:100%}.toolbar .btn{flex:1;justify-content:center}}
   </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top">
     <div><div class="brand">📂 پرونده‌های من</div><div class="muted">مخزن دائمی پرونده‌ها، مدارک، صوت‌ها و گزارش‌های شما</div></div>
-    <a class="btn" href="/">خانه نویسه</a>
+    <div class="toolbar"><a class="btn secondary" href="{% url 'portal:dashboard' %}">داشبورد من</a><a class="btn" href="/">خانه نویسه</a></div>
   </div>
 
   <section class="section">
