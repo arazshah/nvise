@@ -85,12 +85,12 @@ def handle_analysis_action(*, provider, user, message) -> bool:
     if text == GENERATE_REPORT_LABEL:
         try:
             generate_report_revision(case=case, created_by=user)
-        except ValueError as exc:
+        except ValueError:
             async_to_sync(provider.send_text)(
                 message.external_chat_id,
                 "⚠️ هنوز امکان تولید گزارش وجود ندارد.\n\n"
-                f"{str(exc)}\n\n"
-                "ابتدا موارد باز را رفع کنید یا گزینه «ادامه با اطلاعات فعلی» را انتخاب کنید.",
+                "تحلیل پرونده باید کامل شده باشد و هیچ مورد بازی بدون تصمیم شما باقی نماند.\n"
+                "ابتدا موارد را رفع کنید یا گزینه «ادامه با اطلاعات فعلی» را انتخاب کنید.",
                 analysis_result_keyboard(case),
             )
             return True
