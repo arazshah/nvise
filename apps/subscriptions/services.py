@@ -32,6 +32,11 @@ PLAN_LIMIT_FIELDS = {
     UsageRecord.Metric.AI_EXTRACTION: "max_ai_extractions_per_period",
 }
 
+COSTLY_METRICS = {
+    UsageRecord.Metric.STT_SECONDS,
+    UsageRecord.Metric.AI_EXTRACTION,
+}
+
 
 DEFAULT_PLAN_DEFINITIONS = {
     "trial": {
@@ -185,7 +190,7 @@ def refresh_subscription_state(tenant: Tenant) -> Subscription:
 def _active_subscription(tenant: Tenant) -> Subscription:
     subscription = refresh_subscription_state(tenant)
     if subscription.status == Subscription.Status.EXPIRED:
-        if (subscription.metadata or {}).get("trial_granted") or subscription.plan.code == "trial":
+        if subscription.plan.code == "trial":
             raise SubscriptionAccessError(
                 "trial_expired",
                 "دوره آزمایشی ۳۰ روزه شما به پایان رسیده است. برای ادامه عملیات هوشمند، یکی از پلن‌های نویسه را فعال کنید.",
@@ -211,7 +216,7 @@ def entitlement_value(tenant: Tenant, key: str, default=None):
 
 
 def period_usage(tenant: Tenant, metric: str) -> Decimal:
-    subscription = _active_subscription(tenant)
+    subscription = refresh_subscription_state(tenant)
     value = (
         UsageRecord.objects.filter(
             tenant=tenant,
@@ -225,7 +230,7 @@ def period_usage(tenant: Tenant, metric: str) -> Decimal:
 
 
 def metric_limit(tenant: Tenant, metric: str) -> Decimal | None:
-    subscription = _active_subscription(tenant)
+    subscription = refresh_subscription_state(tenant)
     override = subscription.entitlements.filter(key=f"limit.{metric}").first()
     if override is not None:
         raw = override.value.get("value") if isinstance(override.value, dict) else override.value
@@ -238,6 +243,8 @@ def metric_limit(tenant: Tenant, metric: str) -> Decimal | None:
 
 def assert_quota(tenant: Tenant, metric: str, requested: Decimal | int | float = 1) -> None:
     requested = Decimal(str(requested))
+    if metric in COSTLY_METRICS:
+        _active_subscription(tenant)
     limit = metric_limit(tenant, metric)
     if limit is None:
         return
@@ -271,30 +278,28 @@ def record_usage(
 
 def subscription_snapshot(tenant: Tenant) -> dict:
     subscription = refresh_subscription_state(tenant)
-    now = timezone.now()
     metrics = {}
-    if subscription.current_period_end > now:
-        for metric, field in PLAN_LIMIT_FIELDS.items():
-            used = (
-                UsageRecord.objects.filter(
-                    tenant=tenant,
-                    metric=metric,
-                    occurred_at__gte=subscription.current_period_start,
-                    occurred_at__lt=subscription.current_period_end,
-                ).aggregate(total=Sum("quantity"))["total"]
-                or Decimal("0")
-            )
-            metrics[metric] = {
-                "used": str(Decimal(used)),
-                "limit": str(Decimal(str(getattr(subscription.plan, field)))),
-            }
+    for metric, field in PLAN_LIMIT_FIELDS.items():
+        used = (
+            UsageRecord.objects.filter(
+                tenant=tenant,
+                metric=metric,
+                occurred_at__gte=subscription.current_period_start,
+                occurred_at__lt=subscription.current_period_end,
+            ).aggregate(total=Sum("quantity"))["total"]
+            or Decimal("0")
+        )
+        metrics[metric] = {
+            "used": str(Decimal(used)),
+            "limit": str(Decimal(str(getattr(subscription.plan, field)))),
+        }
     return {
         "status": subscription.status,
         "plan": subscription.plan.code,
         "plan_name": subscription.plan.name,
         "period_start": subscription.current_period_start,
         "period_end": subscription.current_period_end,
-        "trial": subscription.plan.code == "trial" or bool((subscription.metadata or {}).get("trial_granted")),
-        "expired": subscription.current_period_end <= now or subscription.status == Subscription.Status.EXPIRED,
+        "trial": subscription.plan.code == "trial",
+        "expired": subscription.status == Subscription.Status.EXPIRED,
         "metrics": metrics,
     }
