@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path
 
+from apps.messaging.views import bale_webhook
+
 
 def health(_request):
     return JsonResponse({"status": "ok", "service": "nvise"})
@@ -10,4 +12,5 @@ def health(_request):
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("health/", health, name="health"),
+    path("webhooks/bale/<str:secret>/", bale_webhook, name="bale-webhook"),
 ]
