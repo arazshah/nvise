@@ -35,6 +35,8 @@ INSTALLED_APPS = [
     "apps.evidence",
     "apps.intelligence",
     "apps.reports",
+    "apps.documents",
+    "apps.portal",
 ]
 
 MIDDLEWARE = [
@@ -89,6 +91,13 @@ MEDIA_ROOT = BASE_DIR / "media"
 PRIVATE_MEDIA_ROOT = Path(env("PRIVATE_MEDIA_ROOT", default=str(BASE_DIR / "private_media")))
 MAX_PROVIDER_FILE_BYTES = env.int("MAX_PROVIDER_FILE_BYTES", default=20 * 1024 * 1024)
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGIN_URL = "/review/login-required/"
+WEB_BASE_URL = env("WEB_BASE_URL", default="http://localhost:8000").rstrip("/")
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
 
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/1")
