@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Entitlement, Plan, Subscription, UsageRecord
+from .models import Entitlement, PaymentAttempt, Plan, Subscription, UsageRecord
 
 
 class EntitlementInline(admin.TabularInline):
@@ -43,6 +43,61 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "external_subscription_id",
     )
     inlines = [EntitlementInline]
+
+
+@admin.register(PaymentAttempt)
+class PaymentAttemptAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "tenant",
+        "user",
+        "plan",
+        "amount",
+        "currency",
+        "status",
+        "paid_at",
+    )
+    list_filter = ("status", "plan", "currency", "created_at")
+    search_fields = (
+        "tenant__name",
+        "tenant__slug",
+        "user__username",
+        "payload",
+        "pre_checkout_query_id",
+        "provider_payment_charge_id",
+        "provider_tracking_id",
+    )
+    readonly_fields = (
+        "id",
+        "tenant",
+        "user",
+        "plan",
+        "provider",
+        "status",
+        "payload",
+        "amount",
+        "currency",
+        "external_user_id",
+        "external_chat_id",
+        "invoice_message_id",
+        "pre_checkout_query_id",
+        "provider_payment_charge_id",
+        "provider_tracking_id",
+        "failure_reason",
+        "raw_precheckout",
+        "raw_successful_payment",
+        "invoice_sent_at",
+        "precheckout_at",
+        "paid_at",
+        "created_at",
+        "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(UsageRecord)
