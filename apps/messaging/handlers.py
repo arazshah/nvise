@@ -3,6 +3,9 @@ from django.db import transaction
 
 from apps.cases.models import Case
 from apps.cases.services import CaseTransitionError, create_case, finish_input
+from apps.evidence.services import sync_message_evidence
+from apps.intelligence.catalog import ensure_fire_loss_schema
+from apps.intelligence.services import start_extraction
 from apps.processing.models import ProcessingJob
 from apps.processing.services import ensure_attachment_job
 from apps.processing.tasks import fetch_attachment
@@ -229,16 +232,20 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
                 "این پرونده در وضعیت فعلی امکان پایان ورود اطلاعات ندارد.",
             )
             return
+        schema = ensure_fire_loss_schema()
+        start_extraction(case=state.active_case, schema=schema)
         state.save(update_fields=["active_case", "updated_at"])
         send_text(
             provider,
             message.external_chat_id,
-            "ورود اطلاعات این پرونده پایان یافت و پرونده وارد مرحله بررسی نهایی شد.",
+            "ورود اطلاعات پایان یافت. پرونده وارد مرحله تحلیل ساختاری و بررسی کمبود/تعارض اطلاعات شد.",
         )
         return
 
     stored = _record_message(inbound=inbound, user=user, state=state, message=message)
     _enqueue_attachment_if_present(stored=stored, message=message)
+    if stored.assignment_status == CaseMessage.AssignmentStatus.ASSIGNED and stored.text.strip():
+        sync_message_evidence(stored)
 
     if stored.assignment_status == CaseMessage.AssignmentStatus.UNASSIGNED:
         if state.active_case is None:
