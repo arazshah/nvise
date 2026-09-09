@@ -20,6 +20,12 @@ class QuotaExceededError(PermissionError):
         self.used = used
 
 
+class SubscriptionAccessError(PermissionError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 PLAN_LIMIT_FIELDS = {
     UsageRecord.Metric.CASE_CREATED: "max_cases_per_period",
     UsageRecord.Metric.STT_SECONDS: "max_stt_seconds_per_period",
@@ -27,31 +33,61 @@ PLAN_LIMIT_FIELDS = {
 }
 
 
+DEFAULT_PLAN_DEFINITIONS = {
+    "trial": {
+        "name": "آزمایشی ۳۰ روزه",
+        "monthly_price": 0,
+        "currency": "IRR",
+        "max_cases_per_period": 5,
+        "max_stt_seconds_per_period": 1800,
+        "max_ai_extractions_per_period": 15,
+        "max_members": 1,
+        "features": {
+            "docx": True,
+            "web_review": True,
+            "priority_processing": False,
+            "trial": True,
+        },
+    },
+    "pro": {
+        "name": "حرفه‌ای",
+        "monthly_price": 490000,
+        "currency": "IRR",
+        "max_cases_per_period": 50,
+        "max_stt_seconds_per_period": 18000,
+        "max_ai_extractions_per_period": 150,
+        "max_members": 1,
+        "features": {
+            "docx": True,
+            "web_review": True,
+            "priority_processing": True,
+            "full_analysis": True,
+            "report_history": True,
+        },
+    },
+    "team": {
+        "name": "تیمی",
+        "monthly_price": 1490000,
+        "currency": "IRR",
+        "max_cases_per_period": 200,
+        "max_stt_seconds_per_period": 72000,
+        "max_ai_extractions_per_period": 600,
+        "max_members": 5,
+        "features": {
+            "docx": True,
+            "web_review": True,
+            "priority_processing": True,
+            "full_analysis": True,
+            "report_history": True,
+            "team_workspace": True,
+        },
+    },
+}
+
+
 def ensure_default_plans() -> dict[str, Plan]:
-    defaults = {
-        "free": {
-            "name": "Free",
-            "monthly_price": 0,
-            "currency": "IRR",
-            "max_cases_per_period": 5,
-            "max_stt_seconds_per_period": 1800,
-            "max_ai_extractions_per_period": 25,
-            "max_members": 1,
-            "features": {"docx": True, "web_review": True},
-        },
-        "pro": {
-            "name": "Pro",
-            "monthly_price": 0,
-            "currency": "IRR",
-            "max_cases_per_period": 100,
-            "max_stt_seconds_per_period": 36000,
-            "max_ai_extractions_per_period": 500,
-            "max_members": 5,
-            "features": {"docx": True, "web_review": True, "priority_processing": True},
-        },
-    }
     result = {}
-    for code, values in defaults.items():
+    for code, values in DEFAULT_PLAN_DEFINITIONS.items():
         plan, _ = Plan.objects.get_or_create(code=code, defaults=values)
         result[code] = plan
     return result
@@ -63,14 +99,19 @@ def get_or_create_subscription(tenant: Tenant) -> Subscription:
     subscription = Subscription.objects.select_for_update().filter(tenant=locked_tenant).first()
     if subscription is not None:
         return subscription
-    free = ensure_default_plans()["free"]
+
+    trial = ensure_default_plans()["trial"]
     now = timezone.now()
     return Subscription.objects.create(
         tenant=locked_tenant,
-        plan=free,
-        status=Subscription.Status.ACTIVE,
+        plan=trial,
+        status=Subscription.Status.TRIALING,
         current_period_start=now,
         current_period_end=now + timedelta(days=30),
+        metadata={
+            "trial_granted": True,
+            "trial_started_at": now.isoformat(),
+        },
     )
 
 
@@ -127,13 +168,37 @@ def set_entitlement(*, tenant: Tenant, key: str, value, source=Entitlement.Sourc
     return entitlement
 
 
-def _active_subscription(tenant: Tenant) -> Subscription:
+@transaction.atomic
+def refresh_subscription_state(tenant: Tenant) -> Subscription:
     subscription = get_or_create_subscription(tenant)
+    subscription = Subscription.objects.select_for_update().get(pk=subscription.pk)
     now = timezone.now()
+    if (
+        subscription.current_period_end <= now
+        and subscription.status in {Subscription.Status.ACTIVE, Subscription.Status.TRIALING}
+    ):
+        subscription.status = Subscription.Status.EXPIRED
+        subscription.save(update_fields=["status", "updated_at"])
+    return subscription
+
+
+def _active_subscription(tenant: Tenant) -> Subscription:
+    subscription = refresh_subscription_state(tenant)
+    if subscription.status == Subscription.Status.EXPIRED:
+        if (subscription.metadata or {}).get("trial_granted") or subscription.plan.code == "trial":
+            raise SubscriptionAccessError(
+                "trial_expired",
+                "دوره آزمایشی ۳۰ روزه شما به پایان رسیده است. برای ادامه عملیات هوشمند، یکی از پلن‌های نویسه را فعال کنید.",
+            )
+        raise SubscriptionAccessError(
+            "subscription_expired",
+            "اعتبار اشتراک شما به پایان رسیده است. برای ادامه عملیات هوشمند، اشتراک را تمدید کنید.",
+        )
     if subscription.status not in {Subscription.Status.ACTIVE, Subscription.Status.TRIALING}:
-        raise PermissionError("Tenant subscription is not active")
-    if subscription.current_period_end <= now:
-        raise PermissionError("Tenant subscription period has expired")
+        raise SubscriptionAccessError(
+            "subscription_inactive",
+            "اشتراک این حساب فعال نیست. برای ادامه، وضعیت اشتراک را در بخش اشتراک و مصرف بررسی کنید.",
+        )
     return subscription
 
 
@@ -205,17 +270,31 @@ def record_usage(
 
 
 def subscription_snapshot(tenant: Tenant) -> dict:
-    subscription = _active_subscription(tenant)
+    subscription = refresh_subscription_state(tenant)
+    now = timezone.now()
     metrics = {}
-    for metric in PLAN_LIMIT_FIELDS:
-        metrics[metric] = {
-            "used": str(period_usage(tenant, metric)),
-            "limit": str(metric_limit(tenant, metric)),
-        }
+    if subscription.current_period_end > now:
+        for metric, field in PLAN_LIMIT_FIELDS.items():
+            used = (
+                UsageRecord.objects.filter(
+                    tenant=tenant,
+                    metric=metric,
+                    occurred_at__gte=subscription.current_period_start,
+                    occurred_at__lt=subscription.current_period_end,
+                ).aggregate(total=Sum("quantity"))["total"]
+                or Decimal("0")
+            )
+            metrics[metric] = {
+                "used": str(Decimal(used)),
+                "limit": str(Decimal(str(getattr(subscription.plan, field)))),
+            }
     return {
         "status": subscription.status,
         "plan": subscription.plan.code,
+        "plan_name": subscription.plan.name,
         "period_start": subscription.current_period_start,
         "period_end": subscription.current_period_end,
+        "trial": subscription.plan.code == "trial" or bool((subscription.metadata or {}).get("trial_granted")),
+        "expired": subscription.current_period_end <= now or subscription.status == Subscription.Status.EXPIRED,
         "metrics": metrics,
     }
