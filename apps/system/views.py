@@ -13,6 +13,10 @@ from apps.subscriptions.models import Subscription, UsageRecord
 from apps.tenants.models import Tenant
 
 
+def health(_request):
+    return JsonResponse({"status": "ok", "service": "nvise"})
+
+
 def health_live(_request):
     return JsonResponse({"status": "ok", "service": "nvise", "check": "liveness"})
 
