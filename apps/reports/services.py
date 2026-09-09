@@ -1,5 +1,6 @@
 from django.db import transaction
 
+from apps.audit.services import record_audit_event
 from apps.cases.models import Case, CaseEvent
 from apps.cases.services import approve_case
 from apps.intelligence.models import ExtractedFact
@@ -101,6 +102,14 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
         actor=created_by,
         payload={"report_id": str(report.id), "revision": revision.revision_number},
     )
+    record_audit_event(
+        event_type="report.revision_created",
+        actor=created_by,
+        case=case,
+        object_type="report_revision",
+        object_id=revision.id,
+        metadata={"report_id": str(report.id), "revision": revision.revision_number},
+    )
     return revision
 
 
@@ -152,6 +161,18 @@ def create_review_revision(
             "to_revision": revision.revision_number,
         },
     )
+    record_audit_event(
+        event_type="report.revision_edited",
+        actor=user,
+        case=case,
+        object_type="report_revision",
+        object_id=revision.id,
+        metadata={
+            "report_id": str(report.id),
+            "from_revision": current.revision_number,
+            "to_revision": revision.revision_number,
+        },
+    )
     return revision
 
 
@@ -161,7 +182,7 @@ def approve_report(*, case: Case, user, note: str = "") -> Report:
     if report.status != Report.Status.READY_FOR_REVIEW or report.current_revision_id is None:
         raise ValueError("Report is not ready for approval")
     revision = ReportRevision.objects.get(pk=report.current_revision_id)
-    ReportApproval.objects.create(
+    approval = ReportApproval.objects.create(
         report=report,
         revision=revision,
         approved_by=user,
@@ -170,6 +191,14 @@ def approve_report(*, case: Case, user, note: str = "") -> Report:
     report.status = Report.Status.APPROVED
     report.save(update_fields=["status", "updated_at"])
     approve_case(case=case, actor=user)
+    record_audit_event(
+        event_type="report.approved",
+        actor=user,
+        case=case,
+        object_type="report_approval",
+        object_id=approval.id,
+        metadata={"report_id": str(report.id), "revision": revision.revision_number},
+    )
 
     from apps.documents.services import ensure_docx_document
 
