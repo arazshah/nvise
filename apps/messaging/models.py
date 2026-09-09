@@ -33,9 +33,38 @@ class CaseMessage(models.Model):
         IMAGE = "image", "Image"
         DOCUMENT = "document", "Document"
         LOCATION = "location", "Location"
+        UNKNOWN = "unknown", "Unknown"
+
+    class AssignmentStatus(models.TextChoices):
+        ASSIGNED = "assigned", "Assigned"
+        UNASSIGNED = "unassigned", "Unassigned"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name="messages")
+    inbound_update = models.ForeignKey(
+        InboundUpdate,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="messages",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="case_messages",
+    )
+    case = models.ForeignKey(
+        Case,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    assignment_status = models.CharField(
+        max_length=16,
+        choices=AssignmentStatus.choices,
+        default=AssignmentStatus.UNASSIGNED,
+        db_index=True,
+    )
     provider = models.CharField(max_length=32)
     external_chat_id = models.CharField(max_length=128)
     external_message_id = models.CharField(max_length=128)
@@ -57,10 +86,20 @@ class CaseMessage(models.Model):
 
 class ConversationState(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="conversation_states")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="conversation_states",
+    )
     provider = models.CharField(max_length=32)
     external_chat_id = models.CharField(max_length=128)
-    active_case = models.ForeignKey(Case, null=True, blank=True, on_delete=models.SET_NULL, related_name="active_conversations")
+    active_case = models.ForeignKey(
+        Case,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="active_conversations",
+    )
     state = models.CharField(max_length=64, default="idle")
     pending_action = models.JSONField(default=dict, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
