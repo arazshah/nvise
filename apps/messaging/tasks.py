@@ -12,7 +12,12 @@ from apps.intelligence.actions import handle_analysis_action
 from apps.portal.services import create_portal_access_token
 from apps.subscriptions.models import UsageRecord
 from apps.subscriptions.payments import PaymentError, process_successful_payment
-from apps.subscriptions.services import QuotaExceededError
+from apps.subscriptions.services import (
+    QuotaExceededError,
+    SubscriptionAccessError,
+    get_or_create_subscription,
+    refresh_subscription_state,
+)
 from apps.system.integrations import get_bale_config
 from apps.tenants.models import Tenant, TenantMembership
 from apps.tenants.services import MemberLimitExceededError, add_tenant_member
@@ -69,6 +74,15 @@ def _resolve_bale_user(message):
         )
         add_tenant_member(tenant=tenant, user=user, role=TenantMembership.Role.OWNER)
 
+    membership = (
+        user.tenant_memberships.select_related("tenant")
+        .filter(is_active=True, tenant__is_active=True)
+        .order_by("created_at")
+        .first()
+    )
+    if membership is not None:
+        get_or_create_subscription(membership.tenant)
+
     return user
 
 
@@ -80,8 +94,32 @@ def _finish_non_retryable(inbound, provider, message, exc: Exception) -> None:
         async_to_sync(provider.send_text)(
             message.external_chat_id,
             "سهمیه حساب شما برای این عملیات به پایان رسیده است. "
-            "برای ادامه، طرح یا محدودیت‌های حساب را بررسی کنید.",
+            "از «💳 اشتراک و مصرف» وضعیت استفاده را ببینید یا پلن حساب را ارتقا دهید.",
+            main_menu_keyboard(),
         )
+
+
+def _finish_subscription_block(inbound, provider, message, exc: SubscriptionAccessError) -> None:
+    inbound.processed_at = timezone.now()
+    inbound.processing_error = str(exc)[:2000]
+    inbound.save(update_fields=["processed_at", "processing_error"])
+    if getattr(provider, "client", None) is None:
+        return
+
+    if exc.code == "trial_expired":
+        text = (
+            "⏳ دوره آزمایشی شما به پایان رسیده است.\n\n"
+            "پرونده‌ها، مدارک و گزارش‌های قبلی شما کاملاً حفظ شده‌اند؛ فقط عملیات هزینه‌دار مثل "
+            "تبدیل صوت و تحلیل هوشمند تا فعال‌کردن یک پلن متوقف می‌شوند.\n\n"
+            "💳 برای مشاهده وضعیت حساب روی «اشتراک و مصرف» بزنید.\n"
+            "🌐 برای انتخاب پلن و پرداخت، وارد پنل نویسه شوید."
+        )
+    else:
+        text = (
+            f"⚠️ {exc}\n\n"
+            "پرونده‌ها و اطلاعات شما حفظ شده‌اند. برای ادامه عملیات هوشمند وضعیت اشتراک را بررسی کنید."
+        )
+    async_to_sync(provider.send_text)(message.external_chat_id, text, main_menu_keyboard())
 
 
 def _send_portal_access_link(*, provider, user, message) -> None:
@@ -119,18 +157,7 @@ def _show_billing_summary(*, provider, user, message) -> None:
         return
 
     tenant = membership.tenant
-    subscription = getattr(tenant, "subscription", None)
-    if subscription is None:
-        text = (
-            "💳 اشتراک و مصرف\n"
-            "━━━━━━━━━━━━━━\n"
-            f"🏢 حساب: {tenant.name}\n"
-            "📦 پلن فعال: ندارید\n\n"
-            "برای مشاهده پلن‌ها و خرید اشتراک، از «🌐 ورود به پنل نویسه» استفاده کنید."
-        )
-        async_to_sync(provider.send_text)(message.external_chat_id, text, main_menu_keyboard())
-        return
-
+    subscription = refresh_subscription_state(tenant)
     plan = subscription.plan
     usage = {
         row["metric"]: row["total"]
@@ -148,6 +175,14 @@ def _show_billing_summary(*, provider, user, message) -> None:
     ai = usage.get(UsageRecord.Metric.AI_EXTRACTION, 0)
     docs = usage.get(UsageRecord.Metric.DOCUMENT_GENERATED, 0)
     status = SUBSCRIPTION_STATUS_LABELS.get(subscription.status, subscription.status)
+    is_expired = subscription.status == "expired" or subscription.current_period_end <= timezone.now()
+    trial_note = "\n🎁 این پلن یک‌بار و به مدت ۳۰ روز ارائه می‌شود." if plan.code == "trial" else ""
+    expired_note = (
+        "\n\n⛔ اعتبار این دوره تمام شده است. پرونده‌های شما حفظ می‌شوند، اما STT و تحلیل هوشمند "
+        "تا خرید پلن متوقف هستند."
+        if is_expired
+        else ""
+    )
 
     text = (
         "💳 اشتراک و مصرف\n"
@@ -155,12 +190,14 @@ def _show_billing_summary(*, provider, user, message) -> None:
         f"🏢 حساب: {tenant.name}\n"
         f"📦 پلن: {plan.name}\n"
         f"✅ وضعیت: {status}\n"
-        f"📅 اعتبار تا: {subscription.current_period_end:%Y/%m/%d}\n\n"
+        f"📅 اعتبار تا: {subscription.current_period_end:%Y/%m/%d}"
+        f"{trial_note}\n\n"
         "📊 مصرف دوره جاری\n"
         f"📁 پرونده: {cases} از {plan.max_cases_per_period}\n"
         f"🎙 تبدیل صوت: {stt} از {plan.max_stt_seconds_per_period} ثانیه\n"
         f"🧠 تحلیل هوشمند: {ai} از {plan.max_ai_extractions_per_period}\n"
-        f"📄 سند تولیدشده: {docs}\n\n"
+        f"📄 سند تولیدشده: {docs}"
+        f"{expired_note}\n\n"
         "برای خرید، تمدید یا تغییر پلن از «🌐 ورود به پنل نویسه» استفاده کنید؛ "
         "صورتحساب نهایی داخل همین گفتگوی بله برای شما ارسال می‌شود."
     )
@@ -234,6 +271,9 @@ def process_bale_update(self, inbound_update_id: str) -> None:
         inbound.processed_at = timezone.now()
         inbound.processing_error = ""
         inbound.save(update_fields=["processed_at", "processing_error"])
+    except SubscriptionAccessError as exc:
+        _finish_subscription_block(inbound, provider, normalized.message, exc)
+        return
     except (QuotaExceededError, MemberLimitExceededError) as exc:
         _finish_non_retryable(inbound, provider, normalized.message, exc)
         return
