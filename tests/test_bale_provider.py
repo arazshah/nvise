@@ -1,4 +1,5 @@
 from apps.messaging.providers.bale import BaleProvider
+from apps.messaging.providers.bale.provider import BILLING_LABEL, PORTAL_LOGIN_LABEL
 
 
 def test_bale_text_update_is_normalized():
@@ -50,3 +51,26 @@ def test_bale_voice_update_is_normalized():
     assert update.message.file is not None
     assert update.message.file.file_id == "voice-file-id"
     assert update.message.file.file_size == 2048
+
+
+def test_permanent_bale_menu_contains_billing_and_portal_entries():
+    keyboard = BaleProvider._with_portal_button(
+        {
+            "keyboard": [[{"text": "➕ پرونده جدید"}]],
+            "resize_keyboard": True,
+        }
+    )
+    labels = [button["text"] for row in keyboard["keyboard"] for button in row]
+
+    assert BILLING_LABEL in labels
+    assert PORTAL_LOGIN_LABEL in labels
+
+
+def test_one_time_keyboard_is_not_polluted_with_global_entries():
+    keyboard = {
+        "keyboard": [[{"text": "گزینه موقت"}]],
+        "resize_keyboard": True,
+        "one_time_keyboard": True,
+    }
+
+    assert BaleProvider._with_portal_button(keyboard) == keyboard
