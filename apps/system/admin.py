@@ -103,6 +103,7 @@ class IntegrationSettingsAdmin(admin.ModelAdmin):
             "fields": (
                 "bale_enabled",
                 "bale_bot_id",
+                "bale_public_url",
                 "bale_bot_token",
                 "bale_webhook_secret",
                 "bale_webhook_rate_limit_per_minute",
