@@ -2,10 +2,11 @@ from django.contrib import admin
 from django.urls import include, path
 
 from apps.messaging.views import bale_webhook
-from apps.system.views import health, health_live, health_ready, home
+from apps.system.views import favicon, health, health_live, health_ready, home
 
 urlpatterns = [
     path("", home, name="home"),
+    path("favicon.ico", favicon, name="favicon"),
     path("admin/", include("apps.system.urls")),
     path("admin/", admin.site.urls),
     path("health/", health, name="health"),
