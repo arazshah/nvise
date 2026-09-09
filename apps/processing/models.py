@@ -64,7 +64,9 @@ class ProcessingJob(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        indexes = [models.Index(fields=["status", "available_at", "priority"])]
+        indexes = [
+            models.Index(fields=["status", "available_at", "priority"], name="proc_job_queue_idx")
+        ]
 
 
 class ProcessingAttempt(models.Model):
