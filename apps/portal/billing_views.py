@@ -56,9 +56,9 @@ def billing_overview(request):
 
     billing_visible = integration.show_billing_portal if integration else True
     online_payment_enabled = integration.online_payment_enabled if integration else False
-    provider_code = integration.payment_provider if integration else "zibal"
-    provider_label = "زیبال" if provider_code == "zibal" else provider_code
-    merchant_configured = bool(integration and integration.zibal_merchant)
+    provider_code = integration.payment_provider if integration else "bale"
+    provider_label = "کیف پول بله" if provider_code == "bale" else provider_code
+    payment_token_configured = bool(integration and integration.bale_payment_token)
 
     return render(
         request,
@@ -80,11 +80,11 @@ def billing_overview(request):
             "period_end": period_end,
             "online_payment_enabled": online_payment_enabled,
             "payment_provider_label": provider_label,
-            "merchant_configured": merchant_configured,
+            "payment_token_configured": payment_token_configured,
             "billing_notice": (
                 integration.billing_notice
                 if integration
-                else "پرداخت آنلاین به‌زودی از طریق زیبال فعال خواهد شد."
+                else "پرداخت اشتراک از طریق کیف پول بله انجام خواهد شد."
             ),
             "support_email": integration.support_email if integration else "mail@araz.me",
         },
