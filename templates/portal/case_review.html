@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>بررسی گزارش {{ case.case_code }}</title>
+  <style>
+    body{font-family:Tahoma,Arial,sans-serif;background:#f5f7fb;margin:0;color:#172033}.wrap{max-width:1100px;margin:32px auto;padding:0 20px}.grid{display:grid;grid-template-columns:2fr 1fr;gap:20px}.card{background:#fff;border-radius:18px;padding:22px;box-shadow:0 10px 30px rgba(21,36,72,.06);margin-bottom:18px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.badge{padding:5px 9px;background:#eef2ff;border-radius:999px;font-size:12px}.muted{color:#667085}.field,textarea{width:100%;box-sizing:border-box;border:1px solid #d0d5dd;border-radius:10px;padding:10px;margin-top:6px}textarea{min-height:130px}.btn{border:0;border-radius:10px;padding:10px 15px;background:#172033;color:#fff;cursor:pointer}.btn.approve{background:#166534}.evidence{border-right:3px solid #d0d5dd;padding:8px 12px;margin:8px 0;font-size:13px}@media(max-width:800px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body><div class="wrap">
+  <div class="card"><div class="row"><h1 style="margin:0">{{ case.title|default:case.case_code }}</h1><span class="badge">{{ case.status }}</span>{% if revision %}<span class="badge">نسخه {{ revision.revision_number }}</span>{% endif %}</div><p class="muted">کد پرونده: {{ case.case_code }}</p></div>
+  <div class="grid"><main>
+    {% if revision %}
+    <form method="post" action="{% url 'portal:edit-report' case.case_code %}">{% csrf_token %}
+      <div class="card"><label>عنوان گزارش<input class="field" name="title" value="{{ revision.title }}"></label><label>خلاصه<textarea name="summary">{{ revision.summary }}</textarea></label></div>
+      {% for section in sections %}<div class="card"><h2>{{ section.title }}</h2><textarea name="section_{{ section.key }}">{{ section.content }}</textarea></div>{% endfor %}
+      {% if case.status == 'ready_for_review' %}<button class="btn" type="submit">ذخیره به‌عنوان نسخه جدید</button>{% endif %}
+    </form>
+    {% if case.status == 'ready_for_review' %}<form method="post" action="{% url 'portal:approve-report' case.case_code %}" style="margin-top:12px">{% csrf_token %}<input class="field" name="note" placeholder="یادداشت تأیید (اختیاری)"><button class="btn approve" type="submit">تأیید نهایی گزارش</button></form>{% endif %}
+    {% else %}<div class="card">هنوز نسخه‌ای برای بررسی تولید نشده است.</div>{% endif %}
+  </main><aside>
+    <div class="card"><h3>اسناد خروجی</h3>{% for document in documents %}<p><span class="badge">{{ document.status }}</span> {{ document.filename|default:'DOCX' }}{% if document.status == 'ready' %}<br><a href="{% url 'portal:download-document' case.case_code document.id %}">دانلود فایل Word</a>{% endif %}</p>{% empty %}<p class="muted">پس از تأیید، DOCX ساخته می‌شود.</p>{% endfor %}</div>
+    <div class="card"><h3>شواهد پرونده</h3>{% for item in evidence %}<div class="evidence"><strong>{{ item.source_kind }}</strong>{% if item.start_ms != None %}<div class="muted">{{ item.start_ms }}ms تا {{ item.end_ms }}ms</div>{% endif %}<div>{{ item.text }}</div></div>{% empty %}<p class="muted">شواهدی ثبت نشده است.</p>{% endfor %}</div>
+  </aside></div>
+</div></body></html>
