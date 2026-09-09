@@ -37,7 +37,7 @@ ANALYZE_COMMANDS = {"/finish", "پایان ورود اطلاعات", "✅ پای
 APPROVE_COMMANDS = {"/approve", "تأیید گزارش", "✅ تأیید گزارش"}
 ARCHIVE_COMMANDS = {"📦 بایگانی پرونده"}
 CHANGE_CASE_COMMANDS = {"🔄 تغییر پرونده"}
-BACK_TO_MENU_COMMANDS = {"↩️ بازگشت به منوی اصلی"}
+BACK_TO_MENU_COMMANDS = {"↩️ بازگشت به منوی اصلی", "🏠 منوی اصلی"}
 
 
 def send_text(provider, chat_id: str, text: str, keyboard: dict | None = None) -> None:
@@ -66,7 +66,7 @@ def active_case_keyboard(case: Case) -> dict:
     rows.extend(
         [
             [{"text": "📦 بایگانی پرونده"}],
-            [{"text": "➕ پرونده جدید"}],
+            [{"text": "➕ پرونده جدید"}, {"text": "🏠 منوی اصلی"}],
         ]
     )
     return {"keyboard": rows, "resize_keyboard": True}
@@ -83,7 +83,7 @@ def _case_selection_keyboard(cases: list[Case]) -> tuple[dict, dict[str, str]]:
         label = f"📁 {title} · {suffix}"
         mapping[label] = str(case.id)
         rows.append([{"text": label}])
-    rows.append([{"text": "↩️ بازگشت به منوی اصلی"}])
+    rows.append([{"text": "🏠 منوی اصلی"}])
     return {"keyboard": rows, "resize_keyboard": True, "one_time_keyboard": True}, mapping
 
 
@@ -202,9 +202,10 @@ def _handle_case_choice(*, state: ConversationState, provider, user, chat_id: st
     if state.state != "choosing_case":
         return False
     if text in BACK_TO_MENU_COMMANDS:
+        state.active_case = None
         state.state = "idle"
         state.pending_action = {}
-        state.save(update_fields=["state", "pending_action", "updated_at"])
+        state.save(update_fields=["active_case", "state", "pending_action", "updated_at"])
         send_text(provider, chat_id, "🏠 به منوی اصلی برگشتید.", main_menu_keyboard())
         return True
 
@@ -241,11 +242,10 @@ def _handle_case_choice(*, state: ConversationState, provider, user, chat_id: st
         "✅ پرونده فعال شد.\n\n"
         f"📝 {selected.title or 'بدون عنوان'}\n"
         f"🔖 {selected.case_code}\n"
-        f"{case_status_label(selected.status)}",
+        f"{case_status_label(selected.status)}\n\n"
+        "از اینجا خودتان انتخاب می‌کنید وضعیت پرونده را ببینید، تحلیل را ادامه دهید یا روی پرونده دیگری کار کنید.",
         active_case_keyboard(selected),
     )
-    if selected.status == Case.Status.NEEDS_INFORMATION:
-        transaction.on_commit(lambda: send_next_follow_up(selected))
     return True
 
 
@@ -311,6 +311,20 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             "اینجا نیازی به حفظ کردن دستور نیست. همه کارهای اصلی با دکمه‌های فارسی انجام می‌شود.\n\n"
             "می‌توانید پرونده بسازید، متن و صوت و مدرک بفرستید و هر زمان خواستید تحلیل را شروع کنید.",
             keyboard,
+        )
+        return
+
+    if text in BACK_TO_MENU_COMMANDS:
+        state.active_case = None
+        state.state = "idle"
+        state.pending_action = {}
+        state.save(update_fields=["active_case", "state", "pending_action", "updated_at"])
+        send_text(
+            provider,
+            message.external_chat_id,
+            "🏠 منوی اصلی\n\n"
+            "پرونده قبلی بسته یا حذف نشده است؛ فقط از آن خارج شدید. حالا می‌توانید پرونده جدید بسازید یا یکی از پرونده‌های قبلی را انتخاب کنید.",
+            main_menu_keyboard(),
         )
         return
 
@@ -421,7 +435,7 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             message.external_chat_id,
             "📦 پرونده بایگانی شد.\n\n"
             f"📝 {archived.title or 'بدون عنوان'}\n"
-            "تمام اطلاعات و مدارک پرونده حفظ شده‌اند و در مرحله بعد امکان مشاهده و بازگشایی از مخزن پرونده‌ها اضافه می‌شود.",
+            "تمام اطلاعات و مدارک پرونده حفظ شده‌اند و می‌توانید بعداً از پنل وب آن را مشاهده یا بازگشایی کنید.",
             main_menu_keyboard(),
         )
         return
