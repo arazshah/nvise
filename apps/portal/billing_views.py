@@ -1,12 +1,14 @@
 from datetime import timedelta
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
-from apps.subscriptions.models import Plan, UsageRecord
+from apps.subscriptions.models import PaymentAttempt, Plan, UsageRecord
+from apps.subscriptions.payments import PAYMENT_ROLES, PaymentError, create_and_send_invoice
 from apps.system.models import IntegrationSettings
 
 
@@ -19,16 +21,20 @@ STATUS_LABELS = {
 }
 
 
-@login_required
-@require_http_methods(["GET"])
-def billing_overview(request):
-    integration = IntegrationSettings.objects.filter(pk=1).first()
-    membership = (
-        request.user.tenant_memberships.select_related("tenant", "tenant__subscription__plan")
+def _billing_membership(user):
+    return (
+        user.tenant_memberships.select_related("tenant", "tenant__subscription__plan")
         .filter(is_active=True, tenant__is_active=True)
         .order_by("created_at")
         .first()
     )
+
+
+@login_required
+@require_http_methods(["GET"])
+def billing_overview(request):
+    integration = IntegrationSettings.objects.filter(pk=1).first()
+    membership = _billing_membership(request.user)
 
     tenant = membership.tenant if membership else None
     subscription = getattr(tenant, "subscription", None) if tenant else None
@@ -59,6 +65,25 @@ def billing_overview(request):
     provider_code = integration.payment_provider if integration else "bale"
     provider_label = "کیف پول بله" if provider_code == "bale" else provider_code
     payment_token_configured = bool(integration and integration.bale_payment_token)
+    can_manage_billing = bool(membership and membership.role in PAYMENT_ROLES)
+    has_bale_identity = bool(
+        getattr(request.user, "bale_identity", None)
+        and request.user.bale_identity.is_active
+        and request.user.bale_identity.external_chat_id
+    )
+    can_pay = bool(
+        billing_visible
+        and online_payment_enabled
+        and payment_token_configured
+        and can_manage_billing
+        and has_bale_identity
+    )
+
+    recent_payments = (
+        PaymentAttempt.objects.filter(tenant=tenant).select_related("plan", "user")[:8]
+        if tenant
+        else PaymentAttempt.objects.none()
+    )
 
     return render(
         request,
@@ -81,6 +106,10 @@ def billing_overview(request):
             "online_payment_enabled": online_payment_enabled,
             "payment_provider_label": provider_label,
             "payment_token_configured": payment_token_configured,
+            "can_manage_billing": can_manage_billing,
+            "has_bale_identity": has_bale_identity,
+            "can_pay": can_pay,
+            "recent_payments": recent_payments,
             "billing_notice": (
                 integration.billing_notice
                 if integration
@@ -89,3 +118,25 @@ def billing_overview(request):
             "support_email": integration.support_email if integration else "mail@araz.me",
         },
     )
+
+
+@login_required
+@require_POST
+def start_bale_checkout(request, plan_code: str):
+    membership = _billing_membership(request.user)
+    if membership is None:
+        messages.error(request, "حساب فعالی برای خرید اشتراک پیدا نشد.")
+        return redirect("portal:billing")
+
+    plan = get_object_or_404(Plan, code=plan_code, is_active=True)
+    try:
+        create_and_send_invoice(user=request.user, tenant=membership.tenant, plan=plan)
+    except PaymentError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(
+            request,
+            "صورتحساب به گفتگوی شما در بله ارسال شد. پرداخت را داخل بله تکمیل کنید؛ "
+            "اشتراک فقط بعد از دریافت تأیید نهایی بله فعال یا تمدید می‌شود.",
+        )
+    return redirect("portal:billing")
