@@ -6,6 +6,7 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     MAX_PROVIDER_FILE_BYTES=(int, 20 * 1024 * 1024),
+    STT_TIMEOUT_SECONDS=(float, 120.0),
 )
 
 env_file = BASE_DIR / ".env"
@@ -29,6 +30,7 @@ INSTALLED_APPS = [
     "apps.cases",
     "apps.messaging",
     "apps.processing",
+    "apps.transcription",
 ]
 
 MIDDLEWARE = [
@@ -91,3 +93,8 @@ CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:
 BALE_BOT_TOKEN = env("BALE_BOT_TOKEN", default="")
 BALE_BOT_ID = env("BALE_BOT_ID", default="primary")
 BALE_WEBHOOK_SECRET = env("BALE_WEBHOOK_SECRET", default="")
+
+STT_PROVIDER = env("STT_PROVIDER", default="http")
+STT_HTTP_ENDPOINT = env("STT_HTTP_ENDPOINT", default="")
+STT_API_KEY = env("STT_API_KEY", default="")
+STT_TIMEOUT_SECONDS = env.float("STT_TIMEOUT_SECONDS", default=120.0)
