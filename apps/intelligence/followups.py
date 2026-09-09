@@ -14,6 +14,9 @@ from .models import CaseFieldIssue, FollowUpQuestion
 MAX_FOLLOW_UP_ATTEMPTS = 2
 UNAVAILABLE_LABEL = "🚫 این اطلاعات در دسترس نیست"
 WAIVE_LABEL = "⏭ با اطلاعات فعلی ادامه بده"
+HOME_MENU_LABEL = "🏠 منوی اصلی"
+NEW_CASE_LABEL = "➕ پرونده جدید"
+MY_CASES_LABEL = "📂 پرونده‌های من"
 
 
 def _detail_lines(issue: CaseFieldIssue) -> list[str]:
@@ -60,9 +63,10 @@ def follow_up_keyboard() -> dict:
         "keyboard": [
             [{"text": UNAVAILABLE_LABEL}],
             [{"text": WAIVE_LABEL}],
+            [{"text": NEW_CASE_LABEL}, {"text": MY_CASES_LABEL}],
+            [{"text": HOME_MENU_LABEL}],
         ],
         "resize_keyboard": True,
-        "one_time_keyboard": True,
     }
 
 
@@ -159,7 +163,8 @@ def send_next_follow_up(case: Case) -> FollowUpQuestion | None:
         f"📝 {case.title or case.case_code}\n"
         f"❓ مورد {number} از {total or 1}\n\n"
         f"{question.question_text}\n\n"
-        "✍️ می‌توانید پاسخ را بنویسید یا یکی از گزینه‌های زیر را انتخاب کنید.",
+        "✍️ می‌توانید پاسخ را بنویسید یا یکی از گزینه‌های زیر را انتخاب کنید.\n"
+        "اگر می‌خواهید فعلاً از این پرونده خارج شوید، منوی اصلی یا پرونده‌های من همیشه در دسترس است.",
         follow_up_keyboard(),
     )
     question.status = FollowUpQuestion.Status.ASKED
