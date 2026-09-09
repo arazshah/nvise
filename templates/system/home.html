@@ -1,241 +1,59 @@
+{% load static %}
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="نویسه؛ دستیار هوشمند پرونده‌محور برای دریافت صوت، متن و مدارک و تبدیل آن‌ها به گزارش ساختاریافته قابل بررسی و تأیید.">
-  <title>نویسه | از پیام و صوت تا گزارش حرفه‌ای</title>
+  <meta name="description" content="نویسه؛ دستیار هوشمند پرونده‌محور برای دریافت صوت، متن و مدارک و تبدیل آن‌ها به گزارش حرفه‌ای قابل بررسی و تأیید.">
+  <title>نویسه | از گفتگو تا گزارش حرفه‌ای</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%232c23a4'/%3E%3Cpath d='M18 16h20a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8h-8l-10 8 2-8h-4a8 8 0 0 1-8-8V24a8 8 0 0 1 8-8Z' fill='white'/%3E%3Cpath d='M25 25h13M25 31h13M25 37h8' stroke='%232c23a4' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
   <style>
-    :root {
-      --bg: #07111f;
-      --panel: #0d1b2d;
-      --panel-2: #10243b;
-      --text: #f4f7fb;
-      --muted: #a9b8cc;
-      --brand: #61e6c3;
-      --brand-2: #79a7ff;
-      --line: rgba(255,255,255,.09);
-      --shadow: 0 22px 70px rgba(0,0,0,.28);
-      --radius: 24px;
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      font-family: Tahoma, Arial, sans-serif;
-      background:
-        radial-gradient(circle at 15% 10%, rgba(121,167,255,.14), transparent 28%),
-        radial-gradient(circle at 85% 15%, rgba(97,230,195,.12), transparent 24%),
-        var(--bg);
-      color: var(--text);
-      line-height: 1.85;
-    }
-    a { color: inherit; text-decoration: none; }
-    .container { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
-    .nav {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 22px 0; gap: 20px;
-    }
-    .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.1rem; }
-    .logo {
-      width: 42px; height: 42px; border-radius: 14px;
-      display: grid; place-items: center; font-weight: 900;
-      background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #07111f;
-      box-shadow: 0 10px 35px rgba(97,230,195,.18);
-    }
-    .nav-links { display: flex; align-items: center; gap: 18px; color: var(--muted); font-size: .94rem; }
-    .nav-links a:hover { color: white; }
-    .hero {
-      min-height: 72vh; display: grid; grid-template-columns: 1.12fr .88fr;
-      gap: 44px; align-items: center; padding: 58px 0 84px;
-    }
-    .eyebrow {
-      display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px;
-      border: 1px solid rgba(97,230,195,.25); border-radius: 999px;
-      background: rgba(97,230,195,.08); color: var(--brand); font-size: .86rem;
-    }
-    h1 { font-size: clamp(2.4rem, 6vw, 5.2rem); line-height: 1.18; margin: 18px 0 20px; letter-spacing: -2px; }
-    .gradient { background: linear-gradient(90deg, var(--brand), var(--brand-2)); -webkit-background-clip: text; color: transparent; }
-    .lead { font-size: 1.12rem; color: var(--muted); max-width: 700px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
-      min-height: 48px; padding: 0 19px; border-radius: 14px; font-weight: 700;
-      border: 1px solid var(--line); transition: .2s ease;
-    }
-    .btn-primary { background: linear-gradient(135deg, var(--brand), #46cfae); color: #07111f; border: none; }
-    .btn-secondary { background: rgba(255,255,255,.04); color: white; }
-    .btn:hover { transform: translateY(-2px); }
-    .hero-card {
-      background: linear-gradient(180deg, rgba(16,36,59,.96), rgba(10,25,42,.96));
-      border: 1px solid var(--line); border-radius: 30px; padding: 24px; box-shadow: var(--shadow);
-    }
-    .chat { display: grid; gap: 12px; }
-    .bubble { padding: 14px 16px; border-radius: 18px; font-size: .94rem; max-width: 92%; }
-    .user { margin-right: auto; background: rgba(121,167,255,.14); border: 1px solid rgba(121,167,255,.18); }
-    .bot { margin-left: auto; background: rgba(97,230,195,.11); border: 1px solid rgba(97,230,195,.18); }
-    .mini-status { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
-    .chip { padding: 7px 10px; border-radius: 999px; background: rgba(255,255,255,.05); color: var(--muted); font-size: .78rem; border: 1px solid var(--line); }
-    section { padding: 82px 0; }
-    .section-head { margin-bottom: 32px; }
-    .section-head h2 { margin: 0 0 10px; font-size: clamp(1.8rem, 4vw, 3rem); }
-    .section-head p { margin: 0; color: var(--muted); max-width: 760px; }
-    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-    .card {
-      background: rgba(13,27,45,.72); border: 1px solid var(--line); border-radius: var(--radius);
-      padding: 24px; box-shadow: 0 12px 35px rgba(0,0,0,.12);
-    }
-    .card .num { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; color: #07111f; font-weight: 900; background: var(--brand); margin-bottom: 18px; }
-    .card h3 { margin: 0 0 8px; font-size: 1.15rem; }
-    .card p { margin: 0; color: var(--muted); font-size: .95rem; }
-    .flow { display: grid; gap: 12px; }
-    .flow-row { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 16px; padding: 17px 18px; border-radius: 18px; background: rgba(255,255,255,.035); border: 1px solid var(--line); }
-    .flow-icon { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: rgba(121,167,255,.13); font-size: 1.25rem; }
-    .flow-title { font-weight: 800; }
-    .flow-desc { color: var(--muted); font-size: .9rem; }
-    .arrow { color: var(--brand); font-size: 1.2rem; }
-    .commands { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-    .command { display: flex; gap: 14px; align-items: flex-start; }
-    code { direction: ltr; display: inline-block; background: #081524; border: 1px solid var(--line); color: var(--brand); padding: 4px 8px; border-radius: 9px; font-family: Consolas, monospace; }
-    .cta {
-      border-radius: 30px; padding: 36px; border: 1px solid rgba(97,230,195,.2);
-      background: linear-gradient(135deg, rgba(97,230,195,.11), rgba(121,167,255,.10));
-      display: flex; align-items: center; justify-content: space-between; gap: 26px;
-    }
-    .cta h2 { margin: 0 0 8px; }
-    .cta p { margin: 0; color: var(--muted); }
-    footer { border-top: 1px solid var(--line); color: var(--muted); padding: 30px 0 45px; font-size: .88rem; }
-    .notice { margin-top: 16px; color: #f4c97a; font-size: .86rem; }
-    @media (max-width: 860px) {
-      .hero { grid-template-columns: 1fr; padding-top: 34px; }
-      .grid-3 { grid-template-columns: 1fr; }
-      .commands { grid-template-columns: 1fr; }
-      .nav-links { display: none; }
-      .flow-row { grid-template-columns: 48px 1fr; }
-      .arrow { display: none; }
-      .cta { flex-direction: column; align-items: flex-start; }
-    }
+    :root{--bg:#06111f;--panel:#0c1a2b;--panel2:#10253c;--text:#f7fbff;--muted:#a8b7ca;--brand:#26d6a4;--brand2:#6e8cff;--line:rgba(255,255,255,.09);--bale:#18c790;--shadow:0 24px 80px rgba(0,0,0,.3);--radius:26px}
+    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;font-family:Vazirmatn,Tahoma,Arial,sans-serif;background:radial-gradient(circle at 10% 8%,rgba(110,140,255,.15),transparent 30%),radial-gradient(circle at 90% 12%,rgba(38,214,164,.12),transparent 26%),var(--bg);color:var(--text);line-height:1.9} a{color:inherit;text-decoration:none} .container{width:min(1160px,calc(100% - 32px));margin:auto}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0;gap:20px}.brand{display:flex;align-items:center;gap:12px;font-weight:900}.logo{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#06111f;font-size:1.25rem}.brand small{display:block;color:var(--muted);font-weight:500;font-size:.72rem;line-height:1.2}.nav-links{display:flex;gap:20px;color:var(--muted);font-size:.92rem}.nav-links a:hover{color:#fff}
+    .hero{display:grid;grid-template-columns:1.02fr .98fr;gap:42px;align-items:center;padding:48px 0 78px;min-height:74vh}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:8px 13px;border-radius:999px;color:var(--brand);background:rgba(38,214,164,.08);border:1px solid rgba(38,214,164,.25);font-size:.86rem}h1{font-size:clamp(2.45rem,5.8vw,5.25rem);line-height:1.17;margin:18px 0 20px;letter-spacing:-1.7px}.gradient{background:linear-gradient(90deg,var(--brand),var(--brand2));-webkit-background-clip:text;color:transparent}.lead{font-size:1.12rem;color:var(--muted);max-width:720px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}.btn{min-height:50px;padding:0 20px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;gap:9px;font-weight:800;border:1px solid var(--line);transition:.2s ease}.btn:hover{transform:translateY(-2px)}.btn-primary{background:linear-gradient(135deg,var(--brand),#35c99e);color:#06111f;border:0}.btn-bale{background:linear-gradient(135deg,#20d39a,#13b980);color:#041612;border:0;box-shadow:0 12px 38px rgba(24,199,144,.18)}.btn-secondary{background:rgba(255,255,255,.04)}
+    .hero-visual{position:relative}.hero-image-wrap{position:relative;border-radius:34px;padding:10px;background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.02));border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden}.hero-image{width:100%;display:block;border-radius:26px;aspect-ratio:1/1;object-fit:cover;background:rgba(255,255,255,.03)}.bale-badge{position:absolute;right:-10px;bottom:28px;background:rgba(7,17,31,.92);backdrop-filter:blur(16px);border:1px solid rgba(38,214,164,.28);border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 16px 40px rgba(0,0,0,.28)}.bale-dot{width:36px;height:36px;border-radius:12px;background:var(--bale);display:grid;place-items:center;font-size:1.15rem}.bale-badge strong{display:block}.bale-badge span{color:var(--muted);font-size:.78rem}
+    .notice{margin-top:14px;color:#f5cc7d;font-size:.85rem}section{padding:78px 0}.section-head{margin-bottom:30px}.section-head h2{font-size:clamp(1.85rem,4vw,3rem);margin:0 0 8px}.section-head p{margin:0;color:var(--muted);max-width:780px}.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.card{background:rgba(12,26,43,.74);border:1px solid var(--line);border-radius:var(--radius);padding:24px;box-shadow:0 14px 38px rgba(0,0,0,.12)}.num{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:var(--brand);color:#06111f;font-weight:900;margin-bottom:17px}.card h3{margin:0 0 8px}.card p{margin:0;color:var(--muted);font-size:.95rem}
+    .bale-section{display:grid;grid-template-columns:.9fr 1.1fr;gap:24px;align-items:center}.bale-panel{background:linear-gradient(145deg,rgba(24,199,144,.11),rgba(110,140,255,.08));border:1px solid rgba(24,199,144,.2);border-radius:30px;padding:28px}.bale-panel h2{margin-top:0}.steps{display:grid;gap:12px;margin-top:18px}.step{display:flex;gap:13px;align-items:flex-start;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:17px;padding:14px}.step i{font-style:normal;width:34px;height:34px;border-radius:11px;background:rgba(24,199,144,.14);display:grid;place-items:center;color:var(--brand);font-weight:900;flex:0 0 auto}.step strong{display:block}.step span{color:var(--muted);font-size:.9rem}
+    .flow{display:grid;gap:12px}.flow-row{display:grid;grid-template-columns:58px 1fr auto;align-items:center;gap:16px;padding:17px 18px;border-radius:18px;background:rgba(255,255,255,.035);border:1px solid var(--line)}.flow-icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:rgba(110,140,255,.13);font-weight:900}.flow-title{font-weight:900}.flow-desc{color:var(--muted);font-size:.9rem}.arrow{color:var(--brand);font-size:1.2rem}code{direction:ltr;display:inline-block;background:#081524;border:1px solid var(--line);color:var(--brand);padding:4px 8px;border-radius:9px;font-family:Consolas,monospace}.commands{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.command{display:flex;gap:14px;align-items:flex-start}.cta{border-radius:30px;padding:36px;border:1px solid rgba(38,214,164,.2);background:linear-gradient(135deg,rgba(38,214,164,.11),rgba(110,140,255,.10));display:flex;align-items:center;justify-content:space-between;gap:24px}.cta h2{margin:0 0 8px}.cta p{margin:0;color:var(--muted)}footer{border-top:1px solid var(--line);color:var(--muted);padding:30px 0 45px;font-size:.88rem}
+    @media(max-width:900px){.hero,.bale-section{grid-template-columns:1fr}.hero{padding-top:30px}.grid-3{grid-template-columns:1fr}.commands{grid-template-columns:1fr}.nav-links{display:none}.flow-row{grid-template-columns:48px 1fr}.arrow{display:none}.cta{flex-direction:column;align-items:flex-start}.bale-badge{right:12px}}
   </style>
 </head>
 <body>
-  <header class="container">
-    <nav class="nav" aria-label="ناوبری اصلی">
-      <a class="brand" href="/">
-        <span class="logo">ن</span>
-        <span>نویسه <small style="display:block;color:var(--muted);font-weight:400">Nvise</small></span>
-      </a>
-      <div class="nav-links">
-        <a href="#how">چطور کار می‌کند؟</a>
-        <a href="#guide">راهنمای شروع</a>
-        <a href="#features">قابلیت‌ها</a>
-      </div>
-    </nav>
-  </header>
-
-  <main>
-    <div class="container hero">
-      <div>
-        <span class="eyebrow">● دستیار هوشمند پرونده‌محور</span>
-        <h1>حرف بزن، مدرک بفرست؛<br><span class="gradient">نویسه گزارش را می‌سازد.</span></h1>
-        <p class="lead">نویسه اطلاعات یک پرونده را از پیام، صوت و فایل دریافت می‌کند، آن‌ها را به داده ساختاریافته تبدیل می‌کند، موارد ناقص یا متناقض را از شما می‌پرسد و در پایان یک گزارش حرفه‌ای برای بررسی و تأیید آماده می‌کند.</p>
-        <div class="actions">
-          {% if bale_public_url %}
-            <a class="btn btn-primary" href="{{ bale_public_url }}" target="_blank" rel="noopener">شروع در پیام‌رسان بله ←</a>
-          {% else %}
-            <a class="btn btn-primary" href="#guide">راهنمای شروع ←</a>
-          {% endif %}
-          <a class="btn btn-secondary" href="#how">نویسه چطور کار می‌کند؟</a>
-        </div>
-        {% if not bale_public_url %}
-          <div class="notice">مدیر سامانه هنوز لینک عمومی ربات بله را در تنظیمات سایت ثبت نکرده است.</div>
-        {% endif %}
-      </div>
-
-      <aside class="hero-card" aria-label="نمونه مکالمه با نویسه">
-        <div class="chat">
-          <div class="bubble user">یک پرونده خسارت آتش‌سوزی جدید دارم.</div>
-          <div class="bubble bot">پرونده جدید ایجاد شد. شرح حادثه، صوت، تصویر یا مدارک را ارسال کنید.</div>
-          <div class="bubble user">🔥 ساعت ۲۱:۳۰ آتش‌سوزی در انبار رخ داد. گزارش آتش‌نشانی را هم می‌فرستم.</div>
-          <div class="bubble bot">اطلاعات ثبت شد. شماره بیمه‌نامه هنوز مشخص نیست؛ لطفاً آن را ارسال کنید.</div>
-          <div class="bubble user">/finish</div>
-          <div class="bubble bot">گزارش آماده بررسی است. لینک امن بازبینی برای شما ارسال شد.</div>
-        </div>
-        <div class="mini-status">
-          <span class="chip">🎙 تبدیل صوت به متن</span>
-          <span class="chip">🧠 استخراج هوشمند</span>
-          <span class="chip">🔎 تشخیص اطلاعات ناقص</span>
-          <span class="chip">📄 گزارش DOCX</span>
-        </div>
-      </aside>
+<header class="container"><nav class="nav" aria-label="ناوبری اصلی"><a class="brand" href="/"><span class="logo">ن</span><span>نویسه<small>Nvise · Smart Case Assistant</small></span></a><div class="nav-links"><a href="#bale">شروع در بله</a><a href="#how">چطور کار می‌کند؟</a><a href="#guide">راهنمای کاربر</a><a href="#features">قابلیت‌ها</a></div></nav></header>
+<main>
+  <div class="container hero">
+    <div>
+      <span class="eyebrow">● دستیار هوشمند پرونده‌محور</span>
+      <h1>گفتگو کن، مدرک بفرست؛<br><span class="gradient">گزارش حرفه‌ای تحویل بگیر.</span></h1>
+      <p class="lead">نویسه داخل پیام‌رسان بله کنار کاربر قرار می‌گیرد. متن، صوت، تصویر و فایل را دریافت می‌کند، اطلاعات مهم را استخراج می‌کند، ابهام‌ها را می‌پرسد و در پایان گزارش ساختاریافته و قابل بازبینی می‌سازد.</p>
+      <div class="actions">{% if bale_public_url %}<a class="btn btn-bale" href="{{ bale_public_url }}" target="_blank" rel="noopener">💬 شروع در پیام‌رسان بله</a>{% else %}<a class="btn btn-bale" href="#bale">💬 نحوه شروع در بله</a>{% endif %}<a class="btn btn-secondary" href="#how">روال کار را ببینید</a></div>
+      {% if not bale_public_url %}<div class="notice">لینک عمومی ربات بله هنوز توسط مدیر سامانه ثبت نشده است.</div>{% endif %}
     </div>
-
-    <section id="how">
-      <div class="container">
-        <div class="section-head">
-          <h2>روال کار نویسه</h2>
-          <p>کاربر لازم نیست فرم پیچیده‌ای پر کند. پرونده در همان محیط پیام‌رسان شکل می‌گیرد و نویسه مرحله‌به‌مرحله آن را کامل می‌کند.</p>
-        </div>
-        <div class="flow">
-          <div class="flow-row"><div class="flow-icon">01</div><div><div class="flow-title">شروع گفتگو و ساخت پرونده</div><div class="flow-desc">کاربر وارد ربات می‌شود و با دستور <code>/newcase</code> یک پرونده جدید ایجاد می‌کند.</div></div><div class="arrow">←</div></div>
-          <div class="flow-row"><div class="flow-icon">02</div><div><div class="flow-title">ارسال اطلاعات به شکل طبیعی</div><div class="flow-desc">متن، پیام صوتی، تصویر، فایل و اطلاعات مربوط به حادثه یا پرونده ارسال می‌شود.</div></div><div class="arrow">←</div></div>
-          <div class="flow-row"><div class="flow-icon">03</div><div><div class="flow-title">پردازش و استخراج هوشمند</div><div class="flow-desc">صوت به متن تبدیل می‌شود و اطلاعات مهم پرونده با حفظ ارتباط با شواهد استخراج می‌شوند.</div></div><div class="arrow">←</div></div>
-          <div class="flow-row"><div class="flow-icon">04</div><div><div class="flow-title">تکمیل اطلاعات ناقص</div><div class="flow-desc">اگر فیلدی ناقص، نامعتبر یا متناقض باشد، نویسه سؤال مشخص و مرتبط می‌پرسد.</div></div><div class="arrow">←</div></div>
-          <div class="flow-row"><div class="flow-icon">05</div><div><div class="flow-title">پایان ورود اطلاعات</div><div class="flow-desc">با دستور <code>/finish</code> کاربر اعلام می‌کند که اطلاعات اصلی پرونده را ارسال کرده است.</div></div><div class="arrow">←</div></div>
-          <div class="flow-row"><div class="flow-icon">06</div><div><div class="flow-title">بازبینی، تأیید و دریافت گزارش</div><div class="flow-desc">گزارش در لینک امن وب بازبینی می‌شود، امکان اصلاح دارد و پس از تأیید نسخه DOCX تولید می‌شود.</div></div><div class="arrow">✓</div></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="guide">
-      <div class="container">
-        <div class="section-head">
-          <h2>راهنمای شروع برای کاربر</h2>
-          <p>برای استفاده روزمره، همین چند دستور کافی است.</p>
-        </div>
-        <div class="commands">
-          <div class="card command"><div class="num">1</div><div><h3><code>/start</code></h3><p>شروع کار با ربات و ایجاد حساب/فضای شخصی در اولین استفاده.</p></div></div>
-          <div class="card command"><div class="num">2</div><div><h3><code>/newcase</code></h3><p>ساخت یک پرونده جدید و فعال کردن آن برای دریافت پیام‌ها و مدارک بعدی.</p></div></div>
-          <div class="card command"><div class="num">3</div><div><h3><code>/status</code></h3><p>دیدن وضعیت پرونده فعال و اینکه در چه مرحله‌ای قرار دارد.</p></div></div>
-          <div class="card command"><div class="num">4</div><div><h3><code>/cases</code></h3><p>مشاهده پرونده‌های شما و مدیریت روند کاری چند پرونده.</p></div></div>
-          <div class="card command"><div class="num">5</div><div><h3><code>/finish</code></h3><p>اعلام پایان ورود اولیه اطلاعات و شروع کنترل کامل بودن پرونده و ساخت گزارش.</p></div></div>
-          <div class="card command"><div class="num">6</div><div><h3>لینک بررسی</h3><p>پس از آماده شدن گزارش، نویسه یک لینک امن برای مشاهده، اصلاح و تأیید گزارش ارسال می‌کند.</p></div></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="features">
-      <div class="container">
-        <div class="section-head">
-          <h2>نویسه چه مسئله‌ای را حل می‌کند؟</h2>
-          <p>هدف نویسه حذف اصطکاک بین «جمع‌آوری اطلاعات واقعی پرونده» و «تولید گزارش استاندارد قابل بررسی» است.</p>
-        </div>
-        <div class="grid-3">
-          <div class="card"><div class="num">A</div><h3>ورودی آزاد و طبیعی</h3><p>کاربر می‌تواند به‌جای فرم‌های طولانی، با متن و صوت توضیح دهد و مدارک را همان‌جا ارسال کند.</p></div>
-          <div class="card"><div class="num">B</div><h3>ردیابی شواهد</h3><p>اطلاعات استخراج‌شده به پیام یا بخش مربوط از متن پیاده‌شده متصل می‌شوند تا منبع هر داده قابل پیگیری باشد.</p></div>
-          <div class="card"><div class="num">C</div><h3>گزارش قابل بازبینی</h3><p>هوش مصنوعی گزارش را آماده می‌کند، اما تأیید نهایی توسط کاربر متخصص انجام می‌شود.</p></div>
-        </div>
-      </div>
-    </section>
-
-    <section>
-      <div class="container">
-        <div class="cta">
-          <div>
-            <h2>برای شروع فقط یک پرونده واقعی بسازید.</h2>
-            <p>در بله وارد نویسه شوید، <code>/newcase</code> را بزنید و اطلاعات پرونده را مثل یک گفت‌وگوی عادی ارسال کنید.</p>
-          </div>
-          {% if bale_public_url %}
-            <a class="btn btn-primary" href="{{ bale_public_url }}" target="_blank" rel="noopener">باز کردن ربات بله</a>
-          {% else %}
-            <a class="btn btn-secondary" href="#guide">مطالعه راهنما</a>
-          {% endif %}
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <div class="container">© نویسه — Nvise · دستیار هوشمند پرونده‌محور برای تبدیل اطلاعات پراکنده به گزارش ساختاریافته و قابل تأیید.</div>
-  </footer>
-</body>
-</html>
+    <div class="hero-visual"><div class="hero-image-wrap"><img class="hero-image" id="bale-hero" src="" alt="نمایش استفاده از نویسه در پیام‌رسان بله برای دریافت صوت، فایل و ساخت گزارش حرفه‌ای"></div><div class="bale-badge"><div class="bale-dot">💬</div><div><strong>نویسه در بله</strong><span>ورودی اصلی محصول همین‌جاست</span></div></div></div>
+  </div>
+  <section id="bale"><div class="container bale-section"><div><div class="section-head"><h2>کار اصلی در پیام‌رسان بله انجام می‌شود</h2><p>وب‌سایت برای معرفی و راهنمایی است؛ تجربه روزمره کاربر از داخل ربات بله آغاز می‌شود.</p></div>{% if bale_public_url %}<a class="btn btn-bale" href="{{ bale_public_url }}" target="_blank" rel="noopener">باز کردن ربات نویسه در بله ←</a>{% endif %}</div><div class="bale-panel"><h2>در کمتر از یک دقیقه شروع کنید</h2><div class="steps"><div class="step"><i>1</i><div><strong>ربات را در بله باز کنید</strong><span>روی «شروع» بزنید یا دستور <code>/start</code> را ارسال کنید.</span></div></div><div class="step"><i>2</i><div><strong>پرونده بسازید</strong><span>با <code>/newcase</code> یا دکمه «پرونده جدید» یک پرونده فعال ایجاد کنید.</span></div></div><div class="step"><i>3</i><div><strong>مثل یک گفت‌وگوی عادی اطلاعات بفرستید</strong><span>متن، Voice، فایل، عکس و مدارک مرتبط را ارسال کنید.</span></div></div><div class="step"><i>4</i><div><strong>پایان اطلاعات را اعلام کنید</strong><span>با <code>/finish</code> تحلیل نهایی، سؤال‌های تکمیلی و تولید گزارش شروع می‌شود.</span></div></div></div></div></div></section>
+  <section id="how"><div class="container"><div class="section-head"><h2>روال کار نویسه</h2><p>نویسه فاصله بین اطلاعات پراکنده پرونده و گزارش نهایی قابل اتکا را کم می‌کند.</p></div><div class="flow"><div class="flow-row"><div class="flow-icon">01</div><div><div class="flow-title">ساخت پرونده</div><div class="flow-desc">کاربر در بله پرونده جدید می‌سازد و آن را فعال می‌کند.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">02</div><div><div class="flow-title">ارسال متن، صوت و مدارک</div><div class="flow-desc">ورودی‌ها به پرونده متصل و به‌صورت امن نگهداری می‌شوند.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">03</div><div><div class="flow-title">تبدیل صوت و استخراج هوشمند</div><div class="flow-desc">AvalAI صوت را به متن و اطلاعات را به داده ساختاریافته تبدیل می‌کند.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">04</div><div><div class="flow-title">تشخیص کمبود و تعارض</div><div class="flow-desc">اگر اطلاعات کافی نباشد، نویسه سؤال‌های تکمیلی مشخص می‌پرسد.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">05</div><div><div class="flow-title">ساخت و بازبینی گزارش</div><div class="flow-desc">گزارش در لینک امن وب قابل مشاهده، اصلاح و تأیید است.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">06</div><div><div class="flow-title">دریافت خروجی نهایی</div><div class="flow-desc">پس از تأیید، فایل DOCX آماده و از طریق بله ارسال می‌شود.</div></div><div class="arrow">✓</div></div></div></div></section>
+  <section id="guide"><div class="container"><div class="section-head"><h2>دستورهای مهم کاربر</h2><p>برای استفاده روزمره همین چند دستور کافی است.</p></div><div class="commands"><div class="card command"><div class="num">1</div><div><h3><code>/start</code></h3><p>شروع کار و نمایش منوی اصلی.</p></div></div><div class="card command"><div class="num">2</div><div><h3><code>/newcase</code></h3><p>ساخت یک پرونده جدید.</p></div></div><div class="card command"><div class="num">3</div><div><h3><code>/status</code></h3><p>مشاهده وضعیت پرونده فعال.</p></div></div><div class="card command"><div class="num">4</div><div><h3><code>/cases</code></h3><p>نمایش پرونده‌های باز.</p></div></div><div class="card command"><div class="num">5</div><div><h3><code>/active CASE_CODE</code></h3><p>فعال کردن یک پرونده مشخص.</p></div></div><div class="card command"><div class="num">6</div><div><h3><code>/finish</code></h3><p>پایان ورود اولیه اطلاعات و شروع تحلیل نهایی.</p></div></div></div></div></section>
+  <section id="features"><div class="container"><div class="section-head"><h2>چرا نویسه؟</h2><p>طراحی نویسه بر پایه «پرونده + شواهد + گزارش قابل تأیید» است.</p></div><div class="grid-3"><div class="card"><div class="num">A</div><h3>ورودی طبیعی</h3><p>به‌جای فرم‌های طولانی، کاربر می‌تواند توضیح بدهد، Voice بفرستد و مدارک را همان‌جا ارسال کند.</p></div><div class="card"><div class="num">B</div><h3>ردیابی منبع اطلاعات</h3><p>هر واقعیت استخراج‌شده به پیام یا بخش مرتبط از متن پیاده‌شده متصل می‌شود.</p></div><div class="card"><div class="num">C</div><h3>انسان در حلقه تصمیم</h3><p>هوش مصنوعی گزارش را آماده می‌کند، اما متخصص نسخه نهایی را بازبینی و تأیید می‌کند.</p></div></div></div></section>
+  <section><div class="container"><div class="cta"><div><h2>برای شروع فقط یک پرونده واقعی بسازید.</h2><p>ربات نویسه را در بله باز کنید، <code>/newcase</code> را بزنید و اطلاعات را مثل یک گفت‌وگوی عادی ارسال کنید.</p></div>{% if bale_public_url %}<a class="btn btn-bale" href="{{ bale_public_url }}" target="_blank" rel="noopener">شروع در بله</a>{% else %}<a class="btn btn-secondary" href="#bale">مطالعه راهنما</a>{% endif %}</div></div></section>
+</main>
+<footer><div class="container">© نویسه — Nvise · دستیار هوشمند پرونده‌محور برای تبدیل اطلاعات پراکنده به گزارش ساختاریافته و قابل تأیید.</div></footer>
+<script>
+(async function(){
+  const img=document.getElementById('bale-hero');
+  if(!img) return;
+  const parts=[
+    "{% static 'nvise/hero-0.txt' %}","{% static 'nvise/hero-1.txt' %}","{% static 'nvise/hero-2.txt' %}",
+    "{% static 'nvise/hero-3.txt' %}","{% static 'nvise/hero-4.txt' %}","{% static 'nvise/hero-5.txt' %}","{% static 'nvise/hero-6.txt' %}"
+  ];
+  try {
+    const chunks=await Promise.all(parts.map(url=>fetch(url).then(r=>{if(!r.ok) throw new Error('asset'); return r.text();})));
+    img.src='data:image/webp;base64,'+chunks.join('').trim();
+  } catch(e) {
+    img.alt='نویسه؛ دستیار هوشمند گزارش‌سازی در پیام‌رسان بله';
+  }
+})();
+</script>
+</body></html>
