@@ -5,6 +5,7 @@ import environ
 BASE_DIR = Path(__file__).resolve().parents[2]
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
+    MAX_PROVIDER_FILE_BYTES=(int, 20 * 1024 * 1024),
 )
 
 env_file = BASE_DIR / ".env"
@@ -27,6 +28,7 @@ INSTALLED_APPS = [
     "apps.tenants",
     "apps.cases",
     "apps.messaging",
+    "apps.processing",
 ]
 
 MIDDLEWARE = [
@@ -78,6 +80,8 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+PRIVATE_MEDIA_ROOT = Path(env("PRIVATE_MEDIA_ROOT", default=str(BASE_DIR / "private_media")))
+MAX_PROVIDER_FILE_BYTES = env.int("MAX_PROVIDER_FILE_BYTES", default=20 * 1024 * 1024)
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
