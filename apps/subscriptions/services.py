@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -8,7 +9,7 @@ from django.utils import timezone
 
 from apps.tenants.models import Tenant
 
-from .models import Entitlement, Plan, Subscription, UsageRecord
+from .models import Plan, Subscription, UsageRecord
 
 
 class QuotaExceededError(PermissionError):
@@ -68,7 +69,7 @@ def get_or_create_subscription(tenant: Tenant) -> Subscription:
         plan=free,
         status=Subscription.Status.ACTIVE,
         current_period_start=now,
-        current_period_end=now + timezone.timedelta(days=30),
+        current_period_end=now + timedelta(days=30),
     )
 
 
