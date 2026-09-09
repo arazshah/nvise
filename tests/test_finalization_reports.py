@@ -68,7 +68,9 @@ def test_follow_up_answer_is_linked_to_issue_evidence():
 
     issue.refresh_from_db()
     answered.refresh_from_db()
-    assert issue.status == CaseFieldIssue.Status.RESOLVED
+    assert issue.status == CaseFieldIssue.Status.OPEN
+    assert issue.attempt_count == 1
+    assert issue.resolution_note == "تهران، خیابان نمونه، پلاک ۱۰"
     assert answered.status == FollowUpQuestion.Status.ANSWERED
     assert answered.answer_evidence is not None
     assert answered.answer_evidence.text == "تهران، خیابان نمونه، پلاک ۱۰"
@@ -98,7 +100,8 @@ def test_report_revision_and_approval_transition_case():
 
     revision = generate_report_revision(case=case, created_by=user)
     assert revision.revision_number == 1
-    assert revision.sections.count() == 4
+    assert revision.sections.count() == 5
+    assert revision.sections.filter(key="limitations").exists()
     assert revision.structured_data["facts"]["insured_name"]["value"] == "آراز شاهکرمی"
 
     report = approve_report(case=case, user=user)
