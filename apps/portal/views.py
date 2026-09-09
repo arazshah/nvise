@@ -24,6 +24,10 @@ def _reviewable_case(user, case_code: str) -> Case:
     return case
 
 
+def login_required_page(request):
+    return render(request, "portal/login_required.html")
+
+
 @require_http_methods(["GET", "POST"])
 def review_access(request, token: str):
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
