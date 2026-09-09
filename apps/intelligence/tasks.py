@@ -30,6 +30,12 @@ def _audio_pipeline_pending(case: Case) -> bool:
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+def dispatch_follow_up(self, case_id: str) -> None:
+    case = Case.objects.get(pk=case_id)
+    send_next_follow_up(case)
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def extract_case_facts(self, run_id: str) -> None:
     with transaction.atomic():
         run = (
@@ -76,7 +82,7 @@ def extract_case_facts(self, run_id: str) -> None:
 
         if has_open_issues:
             ensure_follow_up_questions(refreshed_case)
-            send_next_follow_up(refreshed_case)
+            transaction.on_commit(lambda: dispatch_follow_up.delay(str(refreshed_case.id)))
         elif refreshed_case.status == Case.Status.READY_FOR_REVIEW:
             generate_report_revision(case=refreshed_case, created_by=refreshed_case.created_by)
     except Exception as exc:
