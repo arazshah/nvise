@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>پرونده‌های من | نویسه</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif}.wrap{max-width:1120px;margin:0 auto;padding:28px 18px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}.brand{font-size:28px;font-weight:800}.muted{color:#667085}.section{margin-top:28px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.card{background:#fff;border:1px solid #e8ecf4;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(21,36,72,.05)}.title{font-weight:800;font-size:17px;margin-bottom:8px}.meta{font-size:13px;color:#667085;line-height:1.9}.badge{display:inline-flex;padding:5px 10px;border-radius:999px;font-size:12px;background:#eef2ff;color:#334155;margin-top:10px}.badge.archive{background:#f1f5f9;color:#475569}.btn{display:inline-flex;text-decoration:none;background:#172033;color:#fff;padding:9px 14px;border-radius:10px;margin-top:14px;font-size:13px}.empty{background:#fff;border:1px dashed #cfd6e4;border-radius:16px;padding:24px;color:#667085}@media(max-width:850px){.grid{grid-template-columns:1fr 1fr}}@media(max-width:560px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><div class="brand">📂 پرونده‌های من</div><div class="muted">مخزن دائمی پرونده‌ها، مدارک، صوت‌ها و گزارش‌های شما</div></div>
+    <a class="btn" href="/">خانه نویسه</a>
+  </div>
+
+  <section class="section">
+    <h2>🟢 پرونده‌های فعال</h2>
+    {% if active_cases %}<div class="grid">
+      {% for case in active_cases %}<div class="card">
+        <div class="title">{{ case.title|default:'بدون عنوان' }}</div>
+        <div class="meta">کد: {{ case.case_code }}<br>آخرین تغییر: {{ case.updated_at|date:'Y/m/d H:i' }}</div>
+        <span class="badge">فعال</span><br>
+        <a class="btn" href="{% url 'portal:case-repository' case.case_code %}">باز کردن پرونده</a>
+      </div>{% endfor %}
+    </div>{% else %}<div class="empty">در حال حاضر پرونده فعالی ندارید.</div>{% endif %}
+  </section>
+
+  <section class="section">
+    <h2>📦 بایگانی</h2>
+    {% if archived_cases %}<div class="grid">
+      {% for case in archived_cases %}<div class="card">
+        <div class="title">{{ case.title|default:'بدون عنوان' }}</div>
+        <div class="meta">کد: {{ case.case_code }}<br>تاریخ بایگانی: {{ case.archived_at|date:'Y/m/d H:i' }}</div>
+        <span class="badge archive">بایگانی‌شده</span><br>
+        <a class="btn" href="{% url 'portal:case-repository' case.case_code %}">مشاهده مخزن</a>
+      </div>{% endfor %}
+    </div>{% else %}<div class="empty">پرونده بایگانی‌شده‌ای ندارید.</div>{% endif %}
+  </section>
+</div>
+</body>
+</html>
