@@ -8,7 +8,7 @@ from apps.evidence.services import sync_transcript_evidence
 from apps.processing.models import ProcessingAttempt, ProcessingJob
 from apps.processing.storage import read_private_bytes
 from apps.subscriptions.models import UsageRecord
-from apps.subscriptions.services import assert_quota, record_usage
+from apps.subscriptions.services import QuotaExceededError, assert_quota, record_usage
 
 from .models import Recording, Transcript, TranscriptSegment
 from .providers import get_stt_provider
@@ -33,7 +33,14 @@ def transcribe_audio(self, job_id: str) -> None:
         case = attachment.message.case
         if case is None:
             raise RuntimeError("Transcription requires an assigned case")
-        assert_quota(case.tenant, UsageRecord.Metric.STT_SECONDS, 1)
+        try:
+            assert_quota(case.tenant, UsageRecord.Metric.STT_SECONDS, 1)
+        except QuotaExceededError as exc:
+            job.status = ProcessingJob.Status.FAILED
+            job.finished_at = timezone.now()
+            job.last_error = str(exc)[:2000]
+            job.save(update_fields=["status", "finished_at", "last_error", "updated_at"])
+            return
 
         job.status = ProcessingJob.Status.RUNNING
         job.started_at = timezone.now()
