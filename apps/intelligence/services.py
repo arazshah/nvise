@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Any
 
 from django.db import transaction
@@ -11,6 +12,7 @@ from .models import (
     ExtractedFact,
     ExtractionRun,
     FactEvidence,
+    FieldDefinition,
     FieldSchema,
 )
 
@@ -50,6 +52,29 @@ def collect_case_evidence(case: Case) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def _value_is_valid(field: FieldDefinition, value: Any) -> bool:
+    if value is None:
+        return not field.required
+    if field.value_type == FieldDefinition.ValueType.TEXT:
+        return isinstance(value, str)
+    if field.value_type == FieldDefinition.ValueType.INTEGER:
+        return isinstance(value, int) and not isinstance(value, bool)
+    if field.value_type == FieldDefinition.ValueType.DECIMAL:
+        return isinstance(value, (int, float, str)) and not isinstance(value, bool)
+    if field.value_type == FieldDefinition.ValueType.BOOLEAN:
+        return isinstance(value, bool)
+    if field.value_type in {FieldDefinition.ValueType.DATE, FieldDefinition.ValueType.DATETIME}:
+        return isinstance(value, str) and bool(value.strip())
+    if field.value_type == FieldDefinition.ValueType.CHOICE:
+        return value in field.choices
+    return True
+
+
+def _comparison_value(payload: dict[str, Any]) -> str:
+    candidate = payload.get("normalized_value", payload.get("value"))
+    return repr(candidate)
 
 
 @transaction.atomic
@@ -96,17 +121,30 @@ def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -
     CaseFieldIssue.objects.filter(case=run.case, status=CaseFieldIssue.Status.OPEN).delete()
 
     seen_fields: set[str] = set()
+    values_by_field: dict[str, set[str]] = defaultdict(set)
+
     for payload in response.get("facts", []):
         key = payload.get("field")
         field = field_map.get(key)
         if field is None or "value" not in payload:
             continue
         seen_fields.add(key)
+        value = payload["value"]
+        if not _value_is_valid(field, value):
+            CaseFieldIssue.objects.create(
+                case=run.case,
+                field=field,
+                issue_type=CaseFieldIssue.IssueType.INVALID,
+                details={"value": value, "expected_type": field.value_type},
+            )
+            continue
+
+        values_by_field[key].add(_comparison_value(payload))
         fact = ExtractedFact.objects.create(
             case=run.case,
             field=field,
             extraction_run=run,
-            value=payload["value"],
+            value=value,
             normalized_value=payload.get("normalized_value"),
             confidence=payload.get("confidence"),
         )
@@ -124,18 +162,37 @@ def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -
                 details={"reason": "required_field_not_extracted"},
             )
 
+    conflict_keys = {
+        key for key, values in values_by_field.items() if len(values) > 1
+    }
     for conflict in response.get("conflicts", []):
-        field = field_map.get(conflict.get("field"))
-        if field:
+        key = conflict.get("field")
+        if key in field_map:
+            conflict_keys.add(key)
+            CaseFieldIssue.objects.create(
+                case=run.case,
+                field=field_map[key],
+                issue_type=CaseFieldIssue.IssueType.CONFLICT,
+                details=conflict,
+            )
+
+    for key in conflict_keys:
+        field = field_map[key]
+        if not CaseFieldIssue.objects.filter(
+            case=run.case,
+            field=field,
+            issue_type=CaseFieldIssue.IssueType.CONFLICT,
+            status=CaseFieldIssue.Status.OPEN,
+        ).exists():
             CaseFieldIssue.objects.create(
                 case=run.case,
                 field=field,
                 issue_type=CaseFieldIssue.IssueType.CONFLICT,
-                details=conflict,
+                details={"reason": "multiple_distinct_values_extracted"},
             )
-            ExtractedFact.objects.filter(case=run.case, field=field).update(
-                status=ExtractedFact.Status.CONFLICTED
-            )
+        ExtractedFact.objects.filter(case=run.case, field=field).update(
+            status=ExtractedFact.Status.CONFLICTED
+        )
 
     run.raw_response = response
     run.status = ExtractionRun.Status.COMPLETED
