@@ -1,12 +1,55 @@
 from datetime import timedelta
 
+import redis
+from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
+from django.db import connection
 from django.db.models import Count, Q, Sum
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 
 from apps.subscriptions.models import Subscription, UsageRecord
 from apps.tenants.models import Tenant
+
+
+def health_live(_request):
+    return JsonResponse({"status": "ok", "service": "nvise", "check": "liveness"})
+
+
+def health_ready(_request):
+    checks = {"database": False, "redis": False}
+    errors = {}
+
+    try:
+        connection.ensure_connection()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        checks["database"] = True
+    except Exception as exc:
+        errors["database"] = exc.__class__.__name__
+
+    try:
+        client = redis.Redis.from_url(
+            settings.REDIS_URL,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+        )
+        checks["redis"] = bool(client.ping())
+    except Exception as exc:
+        errors["redis"] = exc.__class__.__name__
+
+    ready = all(checks.values())
+    payload = {
+        "status": "ok" if ready else "not_ready",
+        "service": "nvise",
+        "check": "readiness",
+        "dependencies": checks,
+    }
+    if errors:
+        payload["errors"] = errors
+    return JsonResponse(payload, status=200 if ready else 503)
 
 
 @staff_member_required
