@@ -51,7 +51,7 @@ class TaskFailure(models.Model):
 
 class IntegrationSettings(models.Model):
     class PaymentProvider(models.TextChoices):
-        ZIBAL = "zibal", "زیبال"
+        BALE = "bale", "کیف پول بله"
 
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
 
@@ -83,21 +83,17 @@ class IntegrationSettings(models.Model):
     )
     online_payment_enabled = models.BooleanField(
         default=False,
-        help_text="فقط پس از تکمیل اتصال و تأیید جریان پرداخت فعال شود.",
+        help_text="فقط پس از تکمیل جریان sendInvoice و تأیید پرداخت بله فعال شود.",
     )
     payment_provider = models.CharField(
         max_length=32,
         choices=PaymentProvider.choices,
-        default=PaymentProvider.ZIBAL,
+        default=PaymentProvider.BALE,
     )
-    zibal_merchant = models.CharField(
-        max_length=128,
-        blank=True,
-        help_text="Merchant زیبال. تا پیش از راه‌اندازی پرداخت آنلاین می‌تواند خالی بماند.",
-    )
+    bale_payment_token_encrypted = models.TextField(blank=True, editable=False)
     billing_notice = models.CharField(
         max_length=500,
-        default="پرداخت آنلاین به‌زودی از طریق زیبال فعال خواهد شد.",
+        default="پرداخت اشتراک از طریق کیف پول بله انجام خواهد شد.",
     )
 
     last_avalai_test_at = models.DateTimeField(null=True, blank=True, editable=False)
@@ -143,3 +139,10 @@ class IntegrationSettings(models.Model):
 
     def set_bale_webhook_secret(self, value: str) -> None:
         self.bale_webhook_secret_encrypted = _encrypt(value)
+
+    @property
+    def bale_payment_token(self) -> str:
+        return _decrypt(self.bale_payment_token_encrypted)
+
+    def set_bale_payment_token(self, value: str) -> None:
+        self.bale_payment_token_encrypted = _encrypt(value)
