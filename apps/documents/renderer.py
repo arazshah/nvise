@@ -62,6 +62,12 @@ def render_revision_docx(revision: ReportRevision) -> bytes:
         run = heading.add_run(section.title)
         _set_font(run, size=13, bold=True)
 
+        if section.content:
+            paragraph = document.add_paragraph()
+            _rtl(paragraph)
+            run = paragraph.add_run(section.content)
+            _set_font(run)
+
         if section.data:
             table = document.add_table(rows=1, cols=2)
             table.style = "Table Grid"
@@ -77,11 +83,6 @@ def render_revision_docx(revision: ReportRevision) -> bytes:
                         _rtl(paragraph)
                         for cell_run in paragraph.runs:
                             _set_font(cell_run, size=10)
-        elif section.content:
-            paragraph = document.add_paragraph()
-            _rtl(paragraph)
-            run = paragraph.add_run(section.content)
-            _set_font(run)
 
     provenance = document.add_paragraph()
     _rtl(provenance)
