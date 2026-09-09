@@ -1,3 +1,6 @@
+import hashlib
+from io import BytesIO
+
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.http import FileResponse, Http404, HttpResponseBadRequest
@@ -7,7 +10,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from apps.cases.models import Case
 from apps.documents.models import GeneratedDocument
 from apps.processing.storage import read_private_bytes
-from apps.reports.models import Report, ReportRevision
+from apps.reports.models import Report
 from apps.reports.services import approve_report, create_review_revision
 
 from .models import ReviewAccessToken
@@ -23,9 +26,8 @@ def _reviewable_case(user, case_code: str) -> Case:
 
 @require_http_methods(["GET", "POST"])
 def review_access(request, token: str):
-    token_row = ReviewAccessToken.objects.filter(token_hash__isnull=False).filter(
-        token_hash=__import__("hashlib").sha256(token.encode("utf-8")).hexdigest()
-    ).select_related("case").first()
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    token_row = ReviewAccessToken.objects.filter(token_hash=token_hash).select_related("case").first()
     if request.method == "GET":
         return render(request, "portal/access.html", {"token_row": token_row})
 
@@ -107,7 +109,7 @@ def download_document(request, case_code: str, document_id):
         raise Http404
     content = read_private_bytes(document.storage_key)
     response = FileResponse(
-        __import__("io").BytesIO(content),
+        BytesIO(content),
         content_type=document.mime_type,
         as_attachment=True,
         filename=document.filename or f"{case.case_code}.docx",
