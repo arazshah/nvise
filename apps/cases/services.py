@@ -185,6 +185,15 @@ def request_analysis(*, case: Case, actor=None) -> Case:
         actor=actor,
         payload={"from": previous, "to": locked.analysis_status},
     )
+    record_audit_event(
+        event_type="case.analysis_requested",
+        tenant=locked.tenant,
+        actor=actor,
+        case=locked,
+        object_type="case",
+        object_id=locked.id,
+        metadata={"from": previous, "to": locked.analysis_status},
+    )
     return locked
 
 
