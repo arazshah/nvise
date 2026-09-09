@@ -3,6 +3,8 @@ import uuid
 from django.db import transaction
 from django.utils import timezone
 
+from apps.subscriptions.models import UsageRecord
+from apps.subscriptions.services import assert_quota, record_usage
 from apps.tenants.models import Tenant
 
 from .models import Case, CaseEvent
@@ -36,6 +38,7 @@ def generate_case_code() -> str:
 
 @transaction.atomic
 def create_case(*, user, tenant: Tenant, title: str = "") -> Case:
+    assert_quota(tenant, UsageRecord.Metric.CASE_CREATED, 1)
     case = Case.objects.create(
         tenant=tenant,
         created_by=user,
@@ -43,6 +46,13 @@ def create_case(*, user, tenant: Tenant, title: str = "") -> Case:
         case_code=generate_case_code(),
         status=Case.Status.OPEN,
         opened_at=timezone.now(),
+    )
+    record_usage(
+        tenant=tenant,
+        metric=UsageRecord.Metric.CASE_CREATED,
+        quantity=1,
+        idempotency_key=f"case:{case.id}:created",
+        case=case,
     )
     CaseEvent.objects.create(
         case=case,
