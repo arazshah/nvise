@@ -8,6 +8,7 @@ urlpatterns = [
     path("login-required/", views.login_required_page, name="login-required"),
     path("access/portal/<str:token>/", views.portal_access, name="portal-access"),
     path("access/<str:token>/", views.review_access, name="access"),
+    path("dashboard/", views.dashboard, name="dashboard"),
     path("cases/", views.case_list, name="case-list"),
     path("cases/<str:case_code>/", views.case_repository, name="case-repository"),
     path("cases/<str:case_code>/review/", views.case_review, name="case-review"),
