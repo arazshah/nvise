@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
 from apps.intelligence.catalog import ensure_fire_loss_schema
+from apps.system.integrations import get_avalai_config, get_bale_config
 from apps.system.models import TaskFailure
 
 
@@ -36,11 +37,16 @@ class Command(BaseCommand):
         except Exception as exc:
             checks["redis"] = {"ok": False, "error": exc.__class__.__name__}
 
+        bale = get_bale_config()
+        avalai = get_avalai_config()
         configured = {
-            "bale_bot_token": bool(settings.BALE_BOT_TOKEN),
-            "bale_webhook_secret": bool(settings.BALE_WEBHOOK_SECRET),
-            "stt_endpoint": bool(settings.STT_HTTP_ENDPOINT),
-            "ai_extraction_endpoint": bool(settings.AI_EXTRACTION_ENDPOINT),
+            "bale_enabled": bale.enabled,
+            "bale_bot_token": bool(bale.bot_token),
+            "bale_webhook_secret": bool(bale.webhook_secret),
+            "avalai_enabled": avalai.enabled,
+            "avalai_api_key": bool(avalai.api_key),
+            "avalai_text_model": bool(avalai.text_model),
+            "avalai_stt_model": bool(avalai.stt_model),
             "https_web_base_url": settings.WEB_BASE_URL.startswith("https://"),
         }
         for key, ok in configured.items():
