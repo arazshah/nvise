@@ -2,9 +2,29 @@ from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
-from .models import ExtractionRun, FieldSchema
+from apps.cases.models import Case
+from apps.cases.services import transition_case
+from apps.messaging.models import CaseMessage
+from apps.processing.models import ProcessingJob
+
+from .models import CaseFieldIssue, ExtractionRun, FieldSchema
 from .providers import get_extraction_provider
 from .services import apply_extraction_response, collect_case_evidence, serialize_schema
+
+
+def _audio_pipeline_pending(case: Case) -> bool:
+    return ProcessingJob.objects.filter(
+        attachment__message__case=case,
+        attachment__message__message_type__in=[
+            CaseMessage.MessageType.VOICE,
+            CaseMessage.MessageType.AUDIO,
+        ],
+        job_type__in=[
+            ProcessingJob.JobType.FETCH_ATTACHMENT,
+            ProcessingJob.JobType.TRANSCRIBE_AUDIO,
+        ],
+        status__in=[ProcessingJob.Status.PENDING, ProcessingJob.Status.RUNNING],
+    ).exists()
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
@@ -17,6 +37,8 @@ def extract_case_facts(self, run_id: str) -> None:
         )
         if run.status == ExtractionRun.Status.COMPLETED:
             return
+        if _audio_pipeline_pending(run.case):
+            raise RuntimeError("Audio evidence is still being processed")
         run.status = ExtractionRun.Status.RUNNING
         run.error_message = ""
         run.save(update_fields=["status", "error_message"])
@@ -40,6 +62,15 @@ def extract_case_facts(self, run_id: str) -> None:
             }
             run.save(update_fields=["provider", "model_name", "input_snapshot"])
             apply_extraction_response(run=run, response=payload)
+
+        has_open_issues = CaseFieldIssue.objects.filter(
+            case=run.case,
+            status=CaseFieldIssue.Status.OPEN,
+        ).exists()
+        target = Case.Status.NEEDS_INFORMATION if has_open_issues else Case.Status.READY_FOR_REVIEW
+        refreshed_case = Case.objects.get(pk=run.case_id)
+        if refreshed_case.status == Case.Status.FINALIZING:
+            transition_case(case=refreshed_case, target_status=target)
     except Exception as exc:
         with transaction.atomic():
             run = ExtractionRun.objects.select_for_update().get(pk=run.pk)
