@@ -142,8 +142,36 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         for item in cases:
             marker = " ← فعال" if state.active_case_id == item.id else ""
             lines.append(f"• {item.title or 'بدون عنوان'} — {item.case_code}{marker}")
-        lines.append("\nبرای تغییر پرونده فعال، فعلاً از دستور /active استفاده کنید؛ انتخاب دکمه‌ای در گام بعد اضافه می‌شود.")
+        lines.append("\nبرای فعال‌سازی یک پرونده بنویسید: /active CASE_CODE")
         send_text(provider, message.external_chat_id, "\n".join(lines))
+        return
+
+    if normalized_text.startswith("/active "):
+        requested_code = text.split(maxsplit=1)[1].strip()
+        selected = (
+            Case.objects.filter(
+                case_code__iexact=requested_code,
+                tenant__memberships__user=user,
+                tenant__memberships__is_active=True,
+                status__in=[Case.Status.DRAFT, Case.Status.OPEN],
+            )
+            .distinct()
+            .first()
+        )
+        if selected is None:
+            send_text(
+                provider,
+                message.external_chat_id,
+                "پرونده باز قابل فعال‌سازی با این کد پیدا نشد.",
+            )
+            return
+        state.active_case = selected
+        state.save(update_fields=["active_case", "updated_at"])
+        send_text(
+            provider,
+            message.external_chat_id,
+            f"پرونده فعال تغییر کرد:\n{selected.title or 'بدون عنوان'}\nکد: {selected.case_code}",
+        )
         return
 
     if normalized_text in ACTIVE_COMMANDS:
