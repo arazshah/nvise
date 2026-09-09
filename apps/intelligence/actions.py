@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync
 from django.db import transaction
 
 from apps.messaging.models import ConversationState
@@ -11,7 +12,6 @@ from .results import (
     GENERATE_REPORT_LABEL,
     RESOLVE_ISSUES_LABEL,
     analysis_result_keyboard,
-    analysis_result_text,
     waive_open_issues,
 )
 
@@ -46,18 +46,11 @@ def handle_analysis_action(*, provider, user, message) -> bool:
     if text == RESOLVE_ISSUES_LABEL:
         questions = ensure_follow_up_questions(case)
         if not questions:
-            provider_text = (
+            async_to_sync(provider.send_text)(
+                message.external_chat_id,
                 "✅ مورد حل‌نشده‌ای برای این تحلیل باقی نمانده است.\n\n"
-                "اگر آماده هستید می‌توانید گزارش را تولید کنید."
-            )
-            transaction.on_commit(
-                lambda: __import__("asgiref.sync", fromlist=["async_to_sync"]).async_to_sync(
-                    provider.send_text
-                )(
-                    message.external_chat_id,
-                    provider_text,
-                    analysis_result_keyboard(case),
-                )
+                "اگر آماده هستید می‌توانید گزارش را تولید کنید.",
+                analysis_result_keyboard(case),
             )
             return True
         transaction.on_commit(lambda: send_next_follow_up(case))
@@ -67,7 +60,7 @@ def handle_analysis_action(*, provider, user, message) -> bool:
         state.state = "idle"
         state.pending_action = {"analysis_result_case_id": str(case.id)}
         state.save(update_fields=["state", "pending_action", "updated_at"])
-        __import__("asgiref.sync", fromlist=["async_to_sync"]).async_to_sync(provider.send_text)(
+        async_to_sync(provider.send_text)(
             message.external_chat_id,
             "📎 اطلاعات یا مدرک بیشتری اضافه کنید.\n\n"
             "می‌توانید متن، صوت، تصویر یا فایل بفرستید. همه موارد داخل همین پرونده ذخیره می‌شوند.\n"
@@ -81,7 +74,7 @@ def handle_analysis_action(*, provider, user, message) -> bool:
         state.state = "idle"
         state.pending_action = {"analysis_result_case_id": str(case.id)}
         state.save(update_fields=["state", "pending_action", "updated_at"])
-        __import__("asgiref.sync", fromlist=["async_to_sync"]).async_to_sync(provider.send_text)(
+        async_to_sync(provider.send_text)(
             message.external_chat_id,
             "✅ موارد حل‌نشده با انتخاب شما بسته شدند.\n\n"
             "نویسه می‌تواند گزارش را با همین اطلاعات موجود تولید کند.",
@@ -93,7 +86,7 @@ def handle_analysis_action(*, provider, user, message) -> bool:
         try:
             generate_report_revision(case=case, created_by=user)
         except ValueError as exc:
-            __import__("asgiref.sync", fromlist=["async_to_sync"]).async_to_sync(provider.send_text)(
+            async_to_sync(provider.send_text)(
                 message.external_chat_id,
                 "⚠️ هنوز امکان تولید گزارش وجود ندارد.\n\n"
                 f"{str(exc)}\n\n"
@@ -106,7 +99,7 @@ def handle_analysis_action(*, provider, user, message) -> bool:
         state.state = "idle"
         state.pending_action = {}
         state.save(update_fields=["active_case", "state", "pending_action", "updated_at"])
-        __import__("asgiref.sync", fromlist=["async_to_sync"]).async_to_sync(provider.send_text)(
+        async_to_sync(provider.send_text)(
             message.external_chat_id,
             "📄 گزارش بر اساس اطلاعات فعلی پرونده تولید شد.\n\n"
             "لینک امن بررسی گزارش برای شما ارسال می‌شود.",
