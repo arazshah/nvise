@@ -9,6 +9,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.subscriptions.models import PaymentAttempt, Plan, UsageRecord
 from apps.subscriptions.payments import PAYMENT_ROLES, PaymentError, create_and_send_invoice
+from apps.subscriptions.services import refresh_subscription_state
 from apps.system.models import IntegrationSettings
 
 
@@ -37,7 +38,7 @@ def billing_overview(request):
     membership = _billing_membership(request.user)
 
     tenant = membership.tenant if membership else None
-    subscription = getattr(tenant, "subscription", None) if tenant else None
+    subscription = refresh_subscription_state(tenant) if tenant else None
     plan = subscription.plan if subscription else None
 
     if subscription:
@@ -84,6 +85,8 @@ def billing_overview(request):
         if tenant
         else PaymentAttempt.objects.none()
     )
+    is_trial = bool(plan and plan.code == "trial")
+    trial_expired = bool(is_trial and subscription and subscription.status == "expired")
 
     return render(
         request,
@@ -110,6 +113,8 @@ def billing_overview(request):
             "has_bale_identity": has_bale_identity,
             "can_pay": can_pay,
             "recent_payments": recent_payments,
+            "is_trial": is_trial,
+            "trial_expired": trial_expired,
             "billing_notice": (
                 integration.billing_notice
                 if integration
