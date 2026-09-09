@@ -8,7 +8,7 @@ from apps.messaging.models import CaseMessage
 from apps.processing.models import ProcessingJob
 from apps.reports.services import generate_report_revision
 from apps.subscriptions.models import UsageRecord
-from apps.subscriptions.services import assert_quota, record_usage
+from apps.subscriptions.services import QuotaExceededError, assert_quota, record_usage
 
 from .followups import ensure_follow_up_questions, send_next_follow_up
 from .models import CaseFieldIssue, ExtractionRun, FieldSchema
@@ -49,7 +49,14 @@ def extract_case_facts(self, run_id: str) -> None:
             return
         if _audio_pipeline_pending(run.case):
             raise RuntimeError("Audio evidence is still being processed")
-        assert_quota(run.case.tenant, UsageRecord.Metric.AI_EXTRACTION, 1)
+        try:
+            assert_quota(run.case.tenant, UsageRecord.Metric.AI_EXTRACTION, 1)
+        except QuotaExceededError as exc:
+            run.status = ExtractionRun.Status.FAILED
+            run.error_message = str(exc)[:2000]
+            run.completed_at = timezone.now()
+            run.save(update_fields=["status", "error_message", "completed_at"])
+            return
         run.status = ExtractionRun.Status.RUNNING
         run.error_message = ""
         run.save(update_fields=["status", "error_message"])
