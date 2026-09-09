@@ -6,9 +6,13 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     MAX_PROVIDER_FILE_BYTES=(int, 20 * 1024 * 1024),
+    MAX_WEBHOOK_BODY_BYTES=(int, 1024 * 1024),
+    BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE=(int, 120),
     STT_TIMEOUT_SECONDS=(float, 120.0),
     AI_EXTRACTION_TIMEOUT_SECONDS=(float, 120.0),
     REVIEW_LINK_TTL_MINUTES=(int, 15),
+    CELERY_TASK_TIME_LIMIT=(int, 300),
+    CELERY_TASK_SOFT_TIME_LIMIT=(int, 270),
 )
 
 env_file = BASE_DIR / ".env"
@@ -39,11 +43,13 @@ INSTALLED_APPS = [
     "apps.documents",
     "apps.portal",
     "apps.subscriptions",
+    "apps.audit",
     "apps.system",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.system.middleware.RequestContextMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -93,23 +99,37 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 PRIVATE_MEDIA_ROOT = Path(env("PRIVATE_MEDIA_ROOT", default=str(BASE_DIR / "private_media")))
 MAX_PROVIDER_FILE_BYTES = env.int("MAX_PROVIDER_FILE_BYTES", default=20 * 1024 * 1024)
+MAX_WEBHOOK_BODY_BYTES = env.int("MAX_WEBHOOK_BODY_BYTES", default=1024 * 1024)
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "/review/login-required/"
 WEB_BASE_URL = env("WEB_BASE_URL", default="http://localhost:8000").rstrip("/")
 REVIEW_LINK_TTL_MINUTES = env.int("REVIEW_LINK_TTL_MINUTES", default=15)
 SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/1")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/2")
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TASK_TRACK_STARTED = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600}
+CELERY_RESULT_EXPIRES = 86400
+CELERY_TASK_TIME_LIMIT = env.int("CELERY_TASK_TIME_LIMIT", default=300)
+CELERY_TASK_SOFT_TIME_LIMIT = env.int("CELERY_TASK_SOFT_TIME_LIMIT", default=270)
 
 BALE_BOT_TOKEN = env("BALE_BOT_TOKEN", default="")
 BALE_BOT_ID = env("BALE_BOT_ID", default="primary")
 BALE_WEBHOOK_SECRET = env("BALE_WEBHOOK_SECRET", default="")
+BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE = env.int("BALE_WEBHOOK_RATE_LIMIT_PER_MINUTE", default=120)
 
 STT_PROVIDER = env("STT_PROVIDER", default="http")
 STT_HTTP_ENDPOINT = env("STT_HTTP_ENDPOINT", default="")
@@ -120,3 +140,22 @@ AI_EXTRACTION_PROVIDER = env("AI_EXTRACTION_PROVIDER", default="http")
 AI_EXTRACTION_ENDPOINT = env("AI_EXTRACTION_ENDPOINT", default="")
 AI_EXTRACTION_API_KEY = env("AI_EXTRACTION_API_KEY", default="")
 AI_EXTRACTION_TIMEOUT_SECONDS = env.float("AI_EXTRACTION_TIMEOUT_SECONDS", default=120.0)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {"request_context": {"()": "apps.system.logging.RequestContextFilter"}},
+    "formatters": {"json": {"()": "apps.system.logging.JsonFormatter"}},
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "filters": ["request_context"],
+            "formatter": "json",
+        }
+    },
+    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="INFO")},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "nvise.request": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
