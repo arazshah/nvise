@@ -5,6 +5,7 @@ from django.conf import settings
 from apps.cases.models import Case
 from apps.messaging.models import ConversationState
 from apps.messaging.providers.bale import BaleProvider
+from apps.system.integrations import get_bale_config
 
 from .services import create_review_access_token
 
@@ -17,7 +18,8 @@ def send_review_link(self, case_id: str) -> None:
         .order_by("-updated_at")
         .first()
     )
-    if state is None or not settings.BALE_BOT_TOKEN:
+    config = get_bale_config()
+    if state is None or not config.enabled or not config.bot_token:
         return
     raw_token = create_review_access_token(
         user=case.created_by,
@@ -25,7 +27,7 @@ def send_review_link(self, case_id: str) -> None:
         ttl_minutes=settings.REVIEW_LINK_TTL_MINUTES,
     )
     url = f"{settings.WEB_BASE_URL}/review/access/{raw_token}/"
-    provider = BaleProvider(settings.BALE_BOT_TOKEN)
+    provider = BaleProvider(config.bot_token)
     async_to_sync(provider.send_text)(
         state.external_chat_id,
         "گزارش پرونده برای بررسی آماده است.\n\n"
