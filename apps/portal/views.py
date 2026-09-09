@@ -1,4 +1,3 @@
-import hashlib
 from io import BytesIO
 
 from django.contrib.auth import login
@@ -16,8 +15,13 @@ from apps.processing.storage import read_private_bytes
 from apps.reports.models import Report
 from apps.reports.services import approve_report, create_review_revision
 
-from .models import ReviewAccessToken
-from .services import consume_review_access_token, user_can_review_case
+from .models import PortalAccessToken, ReviewAccessToken
+from .services import (
+    consume_portal_access_token,
+    consume_review_access_token,
+    get_portal_access_token,
+    user_can_review_case,
+)
 
 
 def _accessible_case(user, case_code: str) -> Case:
@@ -36,7 +40,38 @@ def login_required_page(request):
 
 
 @require_http_methods(["GET", "POST"])
+def portal_access(request, token: str):
+    token_row = get_portal_access_token(token)
+    now = __import__("django.utils.timezone", fromlist=["now"]).now()
+    valid = bool(
+        token_row
+        and token_row.consumed_at is None
+        and token_row.revoked_at is None
+        and token_row.expires_at > now
+        and token_row.user.is_active
+    )
+
+    if request.method == "GET":
+        return render(
+            request,
+            "portal/portal_access.html",
+            {"token_row": token_row, "token_valid": valid},
+        )
+
+    try:
+        consumed = consume_portal_access_token(token)
+    except (PortalAccessToken.DoesNotExist, ValueError, PermissionError):
+        return HttpResponseBadRequest("این لینک ورود نامعتبر، منقضی یا قبلاً استفاده شده است.")
+
+    login(request, consumed.user, backend="django.contrib.auth.backends.ModelBackend")
+    request.session.cycle_key()
+    return redirect("portal:case-list")
+
+
+@require_http_methods(["GET", "POST"])
 def review_access(request, token: str):
+    import hashlib
+
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     token_row = ReviewAccessToken.objects.filter(token_hash=token_hash).select_related("case").first()
     if request.method == "GET":
@@ -47,6 +82,7 @@ def review_access(request, token: str):
     except (ReviewAccessToken.DoesNotExist, ValueError, PermissionError):
         return HttpResponseBadRequest("این لینک ورود نامعتبر، منقضی یا قبلاً استفاده شده است.")
     login(request, consumed.user, backend="django.contrib.auth.backends.ModelBackend")
+    request.session.cycle_key()
     return redirect("portal:case-repository", case_code=consumed.case.case_code)
 
 
