@@ -18,7 +18,7 @@ def test_public_home_and_guide_reflect_current_product_identity(client):
             "creator_url": "https://araz.me",
             "support_email": "mail@araz.me",
             "show_billing_portal": True,
-            "billing_notice": "پرداخت آنلاین به‌زودی از طریق زیبال فعال خواهد شد.",
+            "billing_notice": "پرداخت اشتراک از طریق کیف پول بله انجام خواهد شد.",
         },
     )
 
@@ -35,7 +35,9 @@ def test_public_home_and_guide_reflect_current_product_identity(client):
     guide_text = guide.content.decode("utf-8")
     assert "راهنمای کامل استفاده از نویسه" in guide_text
     assert "🏠 منوی اصلی" in guide_text
-    assert "زیبال" in guide_text
+    assert "کیف پول بله" in guide_text
+    assert "sendInvoice" in guide_text
+    assert "زیبال" not in guide_text
 
 
 @pytest.mark.django_db
@@ -67,22 +69,25 @@ def test_billing_portal_shows_admin_plan_subscription_and_usage(client):
         quantity=2,
         idempotency_key="billing-test-cases",
     )
-    IntegrationSettings.objects.update_or_create(
+    settings_obj, _ = IntegrationSettings.objects.update_or_create(
         pk=1,
         defaults={
             "show_billing_portal": True,
             "online_payment_enabled": False,
-            "payment_provider": IntegrationSettings.PaymentProvider.ZIBAL,
-            "billing_notice": "پرداخت آنلاین به‌زودی از طریق زیبال فعال خواهد شد.",
+            "payment_provider": IntegrationSettings.PaymentProvider.BALE,
+            "billing_notice": "پرداخت اشتراک از طریق کیف پول بله انجام خواهد شد.",
             "support_email": "mail@araz.me",
         },
     )
+    settings_obj.set_bale_payment_token("WALLET-TEST-1111111111111111")
+    settings_obj.save(update_fields=["bale_payment_token_encrypted", "updated_at"])
 
     client.force_login(user)
     response = client.get("/review/billing/")
     assert response.status_code == 200
     text = response.content.decode("utf-8")
     assert "حرفه‌ای" in text
-    assert "زیبال" in text
-    assert "پرداخت آنلاین به‌زودی" in text
+    assert "کیف پول بله" in text
+    assert "پرداخت اشتراک از طریق کیف پول بله" in text
     assert "2" in text
+    assert settings_obj.bale_payment_token == "WALLET-TEST-1111111111111111"
