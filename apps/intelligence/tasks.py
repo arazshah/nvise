@@ -1,18 +1,21 @@
+from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
 from apps.cases.models import Case
 from apps.cases.services import transition_case
-from apps.messaging.models import CaseMessage
+from apps.messaging.models import CaseMessage, ConversationState
+from apps.messaging.providers.bale import BaleProvider
 from apps.processing.models import ProcessingJob
-from apps.reports.services import generate_report_revision
 from apps.subscriptions.models import UsageRecord
 from apps.subscriptions.services import QuotaExceededError, assert_quota, record_usage
+from apps.system.integrations import get_bale_config
 
 from .followups import ensure_follow_up_questions, send_next_follow_up
 from .models import CaseFieldIssue, ExtractionRun, FieldSchema
 from .providers import get_extraction_provider
+from .results import analysis_result_keyboard, analysis_result_text
 from .services import apply_extraction_response, collect_case_evidence, serialize_schema
 
 
@@ -35,6 +38,28 @@ def _audio_pipeline_pending(case: Case) -> bool:
 def dispatch_follow_up(self, case_id: str) -> None:
     case = Case.objects.get(pk=case_id)
     send_next_follow_up(case)
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+def notify_analysis_result(self, case_id: str) -> None:
+    case = Case.objects.get(pk=case_id)
+    state = (
+        ConversationState.objects.filter(active_case=case, provider="bale")
+        .order_by("-updated_at")
+        .first()
+    )
+    bale = get_bale_config()
+    if state is None or not bale.enabled or not bale.bot_token:
+        return
+    provider = BaleProvider(bale.bot_token)
+    async_to_sync(provider.send_text)(
+        state.external_chat_id,
+        analysis_result_text(case),
+        analysis_result_keyboard(case),
+    )
+    state.state = "idle"
+    state.pending_action = {"analysis_result_case_id": str(case.id)}
+    state.save(update_fields=["state", "pending_action", "updated_at"])
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
@@ -101,19 +126,17 @@ def extract_case_facts(self, run_id: str) -> None:
         )
         refreshed_case.save(update_fields=["analysis_status", "updated_at"])
 
-        # Legacy mirror remains during the staged UI rollout so existing bot/report flows keep working.
-        target = Case.Status.NEEDS_INFORMATION if has_open_issues else Case.Status.READY_FOR_REVIEW
+        # Keep the legacy combined status usable while making analysis/report decisions explicit.
         if refreshed_case.status == Case.Status.FINALIZING:
+            target = Case.Status.NEEDS_INFORMATION if has_open_issues else Case.Status.OPEN
             refreshed_case = transition_case(case=refreshed_case, target_status=target)
 
         if has_open_issues:
             ensure_follow_up_questions(refreshed_case)
-            transaction.on_commit(lambda: dispatch_follow_up.delay(str(refreshed_case.id)))
-        elif refreshed_case.status == Case.Status.READY_FOR_REVIEW:
-            generate_report_revision(case=refreshed_case, created_by=refreshed_case.created_by)
-            from apps.portal.tasks import send_review_link
 
-            transaction.on_commit(lambda: send_review_link.delay(str(refreshed_case.id)))
+        # Do not start questions or generate a report automatically. The user first sees
+        # the analysis result and chooses the next action.
+        transaction.on_commit(lambda: notify_analysis_result.delay(str(refreshed_case.id)))
     except Exception as exc:
         with transaction.atomic():
             run = ExtractionRun.objects.select_for_update().get(pk=run.pk)
