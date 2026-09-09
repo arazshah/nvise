@@ -4,6 +4,7 @@ from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
+from apps.cases.models import Case
 from apps.evidence.services import sync_transcript_evidence
 from apps.processing.models import ProcessingAttempt, ProcessingJob
 from apps.processing.storage import read_private_bytes
@@ -14,14 +15,33 @@ from .models import Recording, Transcript, TranscriptSegment
 from .providers import get_stt_provider
 
 
+def _resume_case_extraction(case_id: str) -> None:
+    case = Case.objects.filter(pk=case_id, status=Case.Status.FINALIZING).first()
+    if case is None:
+        return
+
+    from apps.intelligence.models import ExtractionRun
+    from apps.intelligence.tasks import extract_case_facts
+
+    run = (
+        ExtractionRun.objects.filter(
+            case=case,
+            status__in=[ExtractionRun.Status.PENDING, ExtractionRun.Status.FAILED],
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    if run is not None:
+        extract_case_facts.delay(str(run.id))
+
+
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def transcribe_audio(self, job_id: str) -> None:
     with transaction.atomic():
-        job = (
-            ProcessingJob.objects.select_for_update()
-            .select_related("attachment__message__case__tenant")
-            .get(pk=job_id)
-        )
+        # Lock only the ProcessingJob row. Joining through message.case is unsafe here because
+        # CaseMessage.case is nullable and PostgreSQL rejects FOR UPDATE on the nullable side
+        # of an outer join.
+        job = ProcessingJob.objects.select_for_update().get(pk=job_id)
         if job.status == ProcessingJob.Status.SUCCEEDED:
             return
         if job.job_type != ProcessingJob.JobType.TRANSCRIBE_AUDIO:
@@ -33,8 +53,10 @@ def transcribe_audio(self, job_id: str) -> None:
         case = attachment.message.case
         if case is None:
             raise RuntimeError("Transcription requires an assigned case")
+        tenant = case.tenant
+
         try:
-            assert_quota(case.tenant, UsageRecord.Metric.STT_SECONDS, 1)
+            assert_quota(tenant, UsageRecord.Metric.STT_SECONDS, 1)
         except QuotaExceededError as exc:
             job.status = ProcessingJob.Status.FAILED
             job.finished_at = timezone.now()
@@ -44,9 +66,19 @@ def transcribe_audio(self, job_id: str) -> None:
 
         job.status = ProcessingJob.Status.RUNNING
         job.started_at = timezone.now()
+        job.finished_at = None
         job.attempts += 1
         job.last_error = ""
-        job.save(update_fields=["status", "started_at", "attempts", "last_error", "updated_at"])
+        job.save(
+            update_fields=[
+                "status",
+                "started_at",
+                "finished_at",
+                "attempts",
+                "last_error",
+                "updated_at",
+            ]
+        )
 
         attempt = ProcessingAttempt.objects.create(job=job, attempt_number=job.attempts)
         recording, _ = Recording.objects.select_for_update().get_or_create(
@@ -114,7 +146,7 @@ def transcribe_audio(self, job_id: str) -> None:
 
             billed_seconds = max(1, ceil(duration_ms / 1000)) if duration_ms else 1
             record_usage(
-                tenant=case.tenant,
+                tenant=tenant,
                 metric=UsageRecord.Metric.STT_SECONDS,
                 quantity=billed_seconds,
                 idempotency_key=f"stt:{job.id}",
@@ -135,6 +167,7 @@ def transcribe_audio(self, job_id: str) -> None:
             }
             attempt.save(update_fields=["succeeded", "finished_at", "metadata"])
             transaction.on_commit(lambda: sync_transcript_evidence(transcript))
+            transaction.on_commit(lambda: _resume_case_extraction(str(case.id)))
 
     except Exception as exc:
         with transaction.atomic():
