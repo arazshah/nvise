@@ -36,8 +36,12 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "cancel_at_period_end",
     )
     list_filter = ("status", "plan", "cancel_at_period_end")
-    search_fields = ("tenant__name", "tenant__slug", "external_customer_id", "external_subscription_id")
-    autocomplete_fields = ("tenant", "plan")
+    search_fields = (
+        "tenant__name",
+        "tenant__slug",
+        "external_customer_id",
+        "external_subscription_id",
+    )
     inlines = [EntitlementInline]
 
 
@@ -46,7 +50,15 @@ class UsageRecordAdmin(admin.ModelAdmin):
     list_display = ("tenant", "metric", "quantity", "case", "occurred_at", "idempotency_key")
     list_filter = ("metric", "occurred_at")
     search_fields = ("tenant__name", "tenant__slug", "idempotency_key", "case__case_code")
-    readonly_fields = ("tenant", "metric", "quantity", "idempotency_key", "case", "metadata", "occurred_at")
+    readonly_fields = (
+        "tenant",
+        "metric",
+        "quantity",
+        "idempotency_key",
+        "case",
+        "metadata",
+        "occurred_at",
+    )
 
     def has_add_permission(self, request):
         return False
