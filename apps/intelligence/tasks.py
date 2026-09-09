@@ -85,6 +85,9 @@ def extract_case_facts(self, run_id: str) -> None:
             transaction.on_commit(lambda: dispatch_follow_up.delay(str(refreshed_case.id)))
         elif refreshed_case.status == Case.Status.READY_FOR_REVIEW:
             generate_report_revision(case=refreshed_case, created_by=refreshed_case.created_by)
+            from apps.portal.tasks import send_review_link
+
+            transaction.on_commit(lambda: send_review_link.delay(str(refreshed_case.id)))
     except Exception as exc:
         with transaction.atomic():
             run = ExtractionRun.objects.select_for_update().get(pk=run.pk)
