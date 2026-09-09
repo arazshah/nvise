@@ -116,8 +116,10 @@ class CaseFieldIssue(models.Model):
         INVALID = "invalid", "Invalid"
 
     class Status(models.TextChoices):
-        OPEN = "open", "Open"
-        RESOLVED = "resolved", "Resolved"
+        OPEN = "open", "باز"
+        RESOLVED = "resolved", "رفع شده"
+        UNAVAILABLE = "unavailable", "اطلاعات در دسترس نیست"
+        WAIVED = "waived", "با اطلاعات فعلی ادامه داده شود"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name="field_issues")
@@ -125,8 +127,19 @@ class CaseFieldIssue(models.Model):
     issue_type = models.CharField(max_length=16, choices=IssueType.choices, db_index=True)
     details = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN, db_index=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    resolution_note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["case", "field", "issue_type"],
+                condition=models.Q(status="open"),
+                name="uniq_open_case_field_issue",
+            )
+        ]
 
 
 class FollowUpQuestion(models.Model):
