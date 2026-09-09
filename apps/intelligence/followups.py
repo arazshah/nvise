@@ -61,10 +61,21 @@ def send_next_follow_up(case: Case) -> FollowUpQuestion | None:
     bale = get_bale_config()
     if state is None or not bale.enabled or not bale.bot_token:
         return question
+
+    all_questions = FollowUpQuestion.objects.filter(case=case)
+    total = all_questions.count()
+    answered = all_questions.filter(status=FollowUpQuestion.Status.ANSWERED).count()
+    number = min(answered + 1, total) if total else 1
+
     provider = BaleProvider(bale.bot_token)
     async_to_sync(provider.send_text)(
         state.external_chat_id,
-        f"برای تکمیل پرونده «{case.title or case.case_code}»:\n\n{question.question_text}",
+        f"🧩 تکمیل اطلاعات پرونده\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"📝 {case.title or case.case_code}\n"
+        f"❓ سؤال {number} از {total or 1}\n\n"
+        f"{question.question_text}\n\n"
+        "✍️ پاسخ را به‌صورت متن ارسال کنید.",
     )
     question.status = FollowUpQuestion.Status.ASKED
     question.asked_at = timezone.now()
