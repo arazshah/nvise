@@ -29,6 +29,15 @@ class IntegrationSettingsForm(forms.ModelForm):
         widget=forms.PasswordInput(render_value=False),
         help_text="برای حفظ secret فعلی خالی بگذارید.",
     )
+    bale_payment_token = forms.CharField(
+        required=False,
+        label="Bale Payment Token",
+        widget=forms.PasswordInput(render_value=False),
+        help_text=(
+            "توکن پرداخت کیف پول بله که از @botfather دریافت می‌کنید. "
+            "برای حفظ مقدار فعلی خالی بگذارید؛ مقدار جدید رمزنگاری‌شده ذخیره می‌شود."
+        ),
+    )
 
     class Meta:
         model = IntegrationSettings
@@ -36,6 +45,7 @@ class IntegrationSettingsForm(forms.ModelForm):
             "avalai_api_key_encrypted",
             "bale_bot_token_encrypted",
             "bale_webhook_secret_encrypted",
+            "bale_payment_token_encrypted",
         )
 
     def save(self, commit=True):
@@ -46,6 +56,8 @@ class IntegrationSettingsForm(forms.ModelForm):
             instance.set_bale_bot_token(self.cleaned_data["bale_bot_token"])
         if self.cleaned_data.get("bale_webhook_secret"):
             instance.set_bale_webhook_secret(self.cleaned_data["bale_webhook_secret"])
+        if self.cleaned_data.get("bale_payment_token"):
+            instance.set_bale_payment_token(self.cleaned_data["bale_payment_token"])
         if commit:
             instance.save()
             self.save_m2m()
@@ -62,6 +74,7 @@ class IntegrationSettingsAdmin(admin.ModelAdmin):
         "show_billing_portal",
         "online_payment_enabled",
         "payment_provider",
+        "bale_payment_configured",
         "avalai_configured",
         "bale_configured",
         "updated_at",
@@ -69,6 +82,7 @@ class IntegrationSettingsAdmin(admin.ModelAdmin):
     readonly_fields = (
         "avalai_configured",
         "bale_configured",
+        "bale_payment_configured",
         "bale_webhook_url",
         "last_avalai_test_at",
         "last_avalai_test_ok",
@@ -88,17 +102,19 @@ class IntegrationSettingsAdmin(admin.ModelAdmin):
                 "support_email",
             )
         }),
-        ("Billing & Zibal", {
+        ("Billing & Bale Wallet", {
             "fields": (
                 "show_billing_portal",
                 "online_payment_enabled",
                 "payment_provider",
-                "zibal_merchant",
+                "bale_payment_token",
+                "bale_payment_configured",
                 "billing_notice",
             ),
             "description": (
                 "قیمت‌ها و محدودیت پلن‌ها از بخش Subscriptions → Plans مدیریت می‌شوند. "
-                "تا قبل از تکمیل اتصال واقعی زیبال، Online payment را غیرفعال نگه دارید."
+                "توکن پرداخت کیف پول بله را از @botfather دریافت کنید. تا قبل از تکمیل "
+                "sendInvoice، پاسخ pre_checkout_query و ثبت SuccessfulPayment، Online payment را غیرفعال نگه دارید."
             ),
         }),
         ("AvalAI", {
@@ -156,6 +172,10 @@ class IntegrationSettingsAdmin(admin.ModelAdmin):
     @admin.display(boolean=True, description="Bale token/secret configured")
     def bale_configured(self, obj):
         return bool(obj and obj.bale_bot_token and obj.bale_webhook_secret)
+
+    @admin.display(boolean=True, description="Bale payment token configured")
+    def bale_payment_configured(self, obj):
+        return bool(obj and obj.bale_payment_token)
 
     @admin.display(description="Webhook URL")
     def bale_webhook_url(self, obj):
