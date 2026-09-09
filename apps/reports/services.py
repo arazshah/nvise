@@ -106,12 +106,13 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
 
 @transaction.atomic
 def approve_report(*, case: Case, user, note: str = "") -> Report:
-    report = Report.objects.select_for_update().select_related("current_revision").get(case=case)
+    report = Report.objects.select_for_update().get(case=case)
     if report.status != Report.Status.READY_FOR_REVIEW or report.current_revision_id is None:
         raise ValueError("Report is not ready for approval")
+    revision = ReportRevision.objects.get(pk=report.current_revision_id)
     ReportApproval.objects.create(
         report=report,
-        revision=report.current_revision,
+        revision=revision,
         approved_by=user,
         note=note,
     )
