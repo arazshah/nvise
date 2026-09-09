@@ -22,3 +22,27 @@ class ReviewAccessToken(models.Model):
     @property
     def is_consumed(self) -> bool:
         return self.consumed_at is not None
+
+
+class PortalAccessToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="portal_access_tokens",
+    )
+    token_hash = models.CharField(max_length=64, unique=True)
+    provider = models.CharField(max_length=32, default="bale")
+    external_chat_id = models.CharField(max_length=128, blank=True)
+    expires_at = models.DateTimeField(db_index=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def is_consumed(self) -> bool:
+        return self.consumed_at is not None
+
+    @property
+    def is_revoked(self) -> bool:
+        return self.revoked_at is not None
