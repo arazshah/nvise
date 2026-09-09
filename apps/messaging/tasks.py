@@ -1,10 +1,13 @@
 from asgiref.sync import async_to_sync
 from celery import shared_task
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import BaleIdentity
+from apps.portal.services import create_portal_access_token
 from apps.subscriptions.services import QuotaExceededError
 from apps.system.integrations import get_bale_config
 from apps.tenants.models import Tenant, TenantMembership
@@ -13,6 +16,7 @@ from apps.tenants.services import MemberLimitExceededError, add_tenant_member
 from .handlers import handle_message
 from .models import InboundUpdate
 from .providers.bale import BaleProvider
+from .providers.bale.provider import PORTAL_LOGIN_LABEL
 
 
 def _resolve_bale_user(message):
@@ -63,8 +67,27 @@ def _finish_non_retryable(inbound, provider, message, exc: Exception) -> None:
         async_to_sync(provider.send_text)(
             message.external_chat_id,
             "سهمیه حساب شما برای این عملیات به پایان رسیده است. "
-            "برای ادامه، Plan یا محدودیت‌های حساب را بررسی کنید.",
+            "برای ادامه، طرح یا محدودیت‌های حساب را بررسی کنید.",
         )
+
+
+def _send_portal_access_link(*, provider, user, message) -> None:
+    raw_token = create_portal_access_token(
+        user=user,
+        provider=message.provider,
+        external_chat_id=message.external_chat_id,
+        ttl_minutes=settings.PORTAL_LINK_TTL_MINUTES,
+    )
+    path = reverse("portal:portal-access", kwargs={"token": raw_token})
+    url = f"{settings.WEB_BASE_URL}{path}"
+    async_to_sync(provider.send_text)(
+        message.external_chat_id,
+        "🔐 ورود امن به پنل نویسه\n\n"
+        "این لینک فقط برای حساب بله شما ساخته شده، یک‌بار قابل استفاده است و "
+        f"تا {settings.PORTAL_LINK_TTL_MINUTES} دقیقه اعتبار دارد.\n\n"
+        f"🌐 {url}\n\n"
+        "پس از ورود موفق، همین لینک دیگر قابل استفاده نخواهد بود.",
+    )
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
@@ -86,12 +109,15 @@ def process_bale_update(self, inbound_update_id: str) -> None:
         with transaction.atomic():
             user = _resolve_bale_user(normalized.message)
 
-        handle_message(
-            inbound=inbound,
-            provider=provider,
-            user=user,
-            message=normalized.message,
-        )
+        if (normalized.message.text or "").strip() == PORTAL_LOGIN_LABEL:
+            _send_portal_access_link(provider=provider, user=user, message=normalized.message)
+        else:
+            handle_message(
+                inbound=inbound,
+                provider=provider,
+                user=user,
+                message=normalized.message,
+            )
 
         inbound.processed_at = timezone.now()
         inbound.processing_error = ""
