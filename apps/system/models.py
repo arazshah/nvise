@@ -62,6 +62,10 @@ class IntegrationSettings(models.Model):
 
     bale_enabled = models.BooleanField(default=True)
     bale_bot_id = models.CharField(max_length=128, default="primary")
+    bale_public_url = models.URLField(
+        blank=True,
+        help_text="لینک عمومی ربات بله برای دکمه شروع در صفحه اصلی سایت.",
+    )
     bale_bot_token_encrypted = models.TextField(blank=True, editable=False)
     bale_webhook_secret_encrypted = models.TextField(blank=True, editable=False)
     bale_webhook_rate_limit_per_minute = models.PositiveIntegerField(default=120)
