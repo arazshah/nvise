@@ -37,7 +37,10 @@ def _detail_lines(issue: CaseFieldIssue) -> list[str]:
     if issue.resolution_note:
         lines.append(f"پاسخ قبلی شما: {issue.resolution_note}")
     if issue.attempt_count >= MAX_FOLLOW_UP_ATTEMPTS:
-        lines.append("این مورد قبلاً بررسی شده و برای جلوگیری از تکرار، می‌توانید آن را نامشخص بگذارید یا با اطلاعات فعلی ادامه دهید.")
+        lines.append(
+            "این مورد دو بار بررسی شده است. برای جلوگیری از تکرار بی‌پایان، "
+            "اگر هنوز مقدار قطعی ندارید یکی از گزینه‌های پایین را انتخاب کنید."
+        )
     return lines
 
 
@@ -61,6 +64,29 @@ def follow_up_keyboard() -> dict:
         "resize_keyboard": True,
         "one_time_keyboard": True,
     }
+
+
+def _store_answer_evidence(*, question, inbound, user, message):
+    external_message_id = message.external_message_id or f"update-{inbound.external_update_id}"
+    case_message, _ = CaseMessage.objects.get_or_create(
+        provider=message.provider,
+        external_chat_id=message.external_chat_id,
+        external_message_id=external_message_id,
+        defaults={
+            "inbound_update": inbound,
+            "user": user,
+            "case": question.case,
+            "assignment_status": CaseMessage.AssignmentStatus.ASSIGNED,
+            "message_type": message.message_type,
+            "text": message.text or "",
+            "raw_payload": message.raw or {},
+            "sent_at": message.sent_at,
+        },
+    )
+    evidence = sync_message_evidence(case_message)
+    if evidence is None:
+        raise ValueError("Follow-up answer must contain text")
+    return evidence
 
 
 @transaction.atomic
@@ -173,32 +199,29 @@ def record_follow_up_answer(*, state: ConversationState, inbound, user, message)
         question.answered_at = now
         question.save(update_fields=["status", "answered_at"])
     else:
-        external_message_id = message.external_message_id or f"update-{inbound.external_update_id}"
-        case_message, _ = CaseMessage.objects.get_or_create(
-            provider=message.provider,
-            external_chat_id=message.external_chat_id,
-            external_message_id=external_message_id,
-            defaults={
-                "inbound_update": inbound,
-                "user": user,
-                "case": question.case,
-                "assignment_status": CaseMessage.AssignmentStatus.ASSIGNED,
-                "message_type": message.message_type,
-                "text": message.text or "",
-                "raw_payload": message.raw or {},
-                "sent_at": message.sent_at,
-            },
+        evidence = _store_answer_evidence(
+            question=question,
+            inbound=inbound,
+            user=user,
+            message=message,
         )
-        evidence = sync_message_evidence(case_message)
-        if evidence is None:
-            raise ValueError("Follow-up answer must contain text")
         question.answer_evidence = evidence
         question.status = FollowUpQuestion.Status.ANSWERED
         question.answered_at = now
         question.save(update_fields=["answer_evidence", "status", "answered_at"])
-        question.issue.attempt_count += 1
-        question.issue.resolution_note = answer_text[:1000]
-        question.issue.save(update_fields=["attempt_count", "resolution_note"])
+
+        if question.issue.attempt_count >= MAX_FOLLOW_UP_ATTEMPTS:
+            question.issue.status = CaseFieldIssue.Status.WAIVED
+            question.issue.resolution_note = (
+                f"آخرین پاسخ کاربر: {answer_text[:800]} — پس از {MAX_FOLLOW_UP_ATTEMPTS} تلاش ناموفق، "
+                "برای جلوگیری از تکرار سؤال با اطلاعات فعلی ادامه داده شد."
+            )
+            question.issue.resolved_at = now
+            question.issue.save(update_fields=["status", "resolution_note", "resolved_at"])
+        else:
+            question.issue.attempt_count += 1
+            question.issue.resolution_note = answer_text[:1000]
+            question.issue.save(update_fields=["attempt_count", "resolution_note"])
 
     state.state = "idle"
     state.pending_action = {}
