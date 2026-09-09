@@ -58,9 +58,10 @@ class IntegrationSettingsAdmin(admin.ModelAdmin):
     list_display = (
         "__str__",
         "avalai_enabled",
-        "avalai_text_model",
-        "avalai_stt_model",
         "bale_enabled",
+        "show_billing_portal",
+        "online_payment_enabled",
+        "payment_provider",
         "avalai_configured",
         "bale_configured",
         "updated_at",
@@ -80,6 +81,26 @@ class IntegrationSettingsAdmin(admin.ModelAdmin):
     )
     actions = ("test_avalai", "test_bale", "register_bale_webhook")
     fieldsets = (
+        ("Public product & support", {
+            "fields": (
+                "creator_name",
+                "creator_url",
+                "support_email",
+            )
+        }),
+        ("Billing & Zibal", {
+            "fields": (
+                "show_billing_portal",
+                "online_payment_enabled",
+                "payment_provider",
+                "zibal_merchant",
+                "billing_notice",
+            ),
+            "description": (
+                "قیمت‌ها و محدودیت پلن‌ها از بخش Subscriptions → Plans مدیریت می‌شوند. "
+                "تا قبل از تکمیل اتصال واقعی زیبال، Online payment را غیرفعال نگه دارید."
+            ),
+        }),
         ("AvalAI", {
             "fields": (
                 "avalai_enabled",
