@@ -30,6 +30,10 @@ class JsonFormatter(logging.Formatter):
             "task_id",
             "task_name",
             "audit_event_type",
+            "method",
+            "path",
+            "status_code",
+            "duration_ms",
         ):
             value = getattr(record, key, None)
             if value not in (None, ""):
