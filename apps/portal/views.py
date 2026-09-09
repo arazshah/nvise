@@ -8,7 +8,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.cases.models import Case
+from apps.cases.services import CaseTransitionError, archive_case, reopen_case
 from apps.documents.models import GeneratedDocument
+from apps.messaging.models import CaseMessage
+from apps.processing.models import CaseAttachment
 from apps.processing.storage import read_private_bytes
 from apps.reports.models import Report
 from apps.reports.services import approve_report, create_review_revision
@@ -17,11 +20,15 @@ from .models import ReviewAccessToken
 from .services import consume_review_access_token, user_can_review_case
 
 
-def _reviewable_case(user, case_code: str) -> Case:
+def _accessible_case(user, case_code: str) -> Case:
     case = get_object_or_404(Case.objects.select_related("tenant"), case_code__iexact=case_code)
     if not user_can_review_case(user=user, case=case):
         raise Http404
     return case
+
+
+def _reviewable_case(user, case_code: str) -> Case:
+    return _accessible_case(user, case_code)
 
 
 def login_required_page(request):
@@ -40,7 +47,128 @@ def review_access(request, token: str):
     except (ReviewAccessToken.DoesNotExist, ValueError, PermissionError):
         return HttpResponseBadRequest("این لینک ورود نامعتبر، منقضی یا قبلاً استفاده شده است.")
     login(request, consumed.user, backend="django.contrib.auth.backends.ModelBackend")
-    return redirect("portal:case-review", case_code=consumed.case.case_code)
+    return redirect("portal:case-repository", case_code=consumed.case.case_code)
+
+
+@login_required
+@require_http_methods(["GET"])
+def case_list(request):
+    cases = (
+        Case.objects.filter(
+            tenant__memberships__user=request.user,
+            tenant__memberships__is_active=True,
+            tenant__is_active=True,
+        )
+        .distinct()
+        .order_by("-updated_at")
+    )
+    active_cases = [case for case in cases if case.lifecycle_status == Case.LifecycleStatus.ACTIVE]
+    archived_cases = [case for case in cases if case.lifecycle_status == Case.LifecycleStatus.ARCHIVED]
+    return render(
+        request,
+        "portal/case_list.html",
+        {"active_cases": active_cases, "archived_cases": archived_cases},
+    )
+
+
+def _repository_messages(case: Case, kind: str):
+    messages = case.messages.select_related("attachment").order_by("-sent_at", "-received_at")
+    if kind == "audio":
+        messages = messages.filter(message_type__in=[CaseMessage.MessageType.VOICE, CaseMessage.MessageType.AUDIO])
+    elif kind == "image":
+        messages = messages.filter(message_type=CaseMessage.MessageType.IMAGE)
+    elif kind == "document":
+        messages = messages.filter(message_type=CaseMessage.MessageType.DOCUMENT)
+    elif kind == "note":
+        messages = messages.filter(message_type=CaseMessage.MessageType.TEXT)
+    return messages
+
+
+def _message_rows(messages):
+    rows = []
+    for message in messages:
+        attachment = getattr(message, "attachment", None)
+        transcript = None
+        if attachment is not None and hasattr(attachment, "recording"):
+            transcript = attachment.recording.transcripts.filter(status="completed").order_by("-completed_at", "-created_at").first()
+        rows.append({"message": message, "attachment": attachment, "transcript": transcript})
+    return rows
+
+
+@login_required
+@require_http_methods(["GET"])
+def case_repository(request, case_code: str):
+    case = _accessible_case(request.user, case_code)
+    kind = request.GET.get("type", "all")
+    if kind not in {"all", "audio", "image", "document", "note"}:
+        kind = "all"
+
+    counts = {
+        "all": case.messages.count(),
+        "audio": case.messages.filter(message_type__in=[CaseMessage.MessageType.VOICE, CaseMessage.MessageType.AUDIO]).count(),
+        "image": case.messages.filter(message_type=CaseMessage.MessageType.IMAGE).count(),
+        "document": case.messages.filter(message_type=CaseMessage.MessageType.DOCUMENT).count(),
+        "note": case.messages.filter(message_type=CaseMessage.MessageType.TEXT).count(),
+    }
+    rows = _message_rows(_repository_messages(case, kind))
+    report = Report.objects.filter(case=case).select_related("current_revision").first()
+    return render(
+        request,
+        "portal/case_repository.html",
+        {
+            "case": case,
+            "kind": kind,
+            "counts": counts,
+            "rows": rows,
+            "report": report,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def download_attachment(request, case_code: str, attachment_id):
+    case = _accessible_case(request.user, case_code)
+    attachment = get_object_or_404(
+        CaseAttachment.objects.select_related("message"),
+        pk=attachment_id,
+        message__case=case,
+        status=CaseAttachment.Status.STORED,
+    )
+    if not attachment.storage_key:
+        raise Http404
+    content = read_private_bytes(attachment.storage_key)
+    response = FileResponse(
+        BytesIO(content),
+        content_type=attachment.mime_type or "application/octet-stream",
+        as_attachment=True,
+        filename=attachment.original_name or f"nvise-{attachment.id}",
+    )
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+@login_required
+@require_POST
+def archive_case_view(request, case_code: str):
+    case = _accessible_case(request.user, case_code)
+    try:
+        archive_case(case=case, actor=request.user)
+    except CaseTransitionError:
+        return HttpResponseBadRequest("این پرونده در وضعیت فعلی قابل بایگانی نیست.")
+    return redirect("portal:case-repository", case_code=case.case_code)
+
+
+@login_required
+@require_POST
+def reopen_case_view(request, case_code: str):
+    case = _accessible_case(request.user, case_code)
+    try:
+        reopen_case(case=case, actor=request.user)
+    except CaseTransitionError:
+        return HttpResponseBadRequest("این پرونده قابل بازگشایی نیست.")
+    return redirect("portal:case-repository", case_code=case.case_code)
 
 
 @login_required
