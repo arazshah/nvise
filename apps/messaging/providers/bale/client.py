@@ -41,6 +41,31 @@ class BaleClient:
         result = await self.call("sendMessage", payload)
         return result or {}
 
+    async def send_document(
+        self,
+        chat_id: str,
+        document: bytes,
+        filename: str,
+        caption: str | None = None,
+    ) -> dict[str, Any]:
+        data: dict[str, str] = {"chat_id": str(chat_id)}
+        if caption:
+            data["caption"] = caption
+        files = {
+            "document": (
+                filename,
+                document,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        }
+        async with httpx.AsyncClient(timeout=max(self.timeout, 60.0)) as client:
+            response = await client.post(f"{self.base_url}/sendDocument", data=data, files=files)
+            response.raise_for_status()
+            payload = response.json()
+        if not payload.get("ok"):
+            raise BaleAPIError(payload.get("description") or "Bale sendDocument failed")
+        return payload.get("result") or {}
+
     async def answer_callback_query(self, callback_query_id: str, text: str | None = None) -> None:
         payload: dict[str, Any] = {"callback_query_id": callback_query_id}
         if text:
