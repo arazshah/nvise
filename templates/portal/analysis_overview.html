@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>نتیجه تحلیل {{ case.title|default:case.case_code }} | نویسه</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif;line-height:1.9}.wrap{max-width:1120px;margin:0 auto;padding:28px 18px}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{font:inherit;border:0;border-radius:13px;padding:11px 16px;background:#172033;color:#fff;text-decoration:none;cursor:pointer;font-weight:800}.btn.secondary{background:#eef2ff;color:#27324b}.btn.success{background:#166534}.btn.warn{background:#92400e}.hero{background:linear-gradient(135deg,#111827,#312e81);color:#fff;border-radius:24px;padding:26px;box-shadow:0 18px 44px rgba(49,46,129,.18);margin:22px 0}.hero h1{margin:0 0 4px}.muted{color:#667085}.hero .muted{color:#cbd5e1}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:20px}.stat{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:15px}.stat span{font-size:12px;color:#dbeafe}.stat b{display:block;font-size:26px;margin-top:4px}.card{background:#fff;border:1px solid #e7ebf3;border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:0 10px 30px rgba(21,36,72,.04)}.decision{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.issue{border-right:4px solid #f59e0b;background:#fffaf0}.issue-title{font-weight:900;color:#92400e}.badge{display:inline-flex;padding:5px 9px;border-radius:999px;background:#eef2ff;font-size:12px;font-weight:700}.ok{background:#ecfdf3;color:#166534}.warnbox{background:#fff7ed;border:1px solid #fed7aa;border-radius:16px;padding:14px;color:#9a3412}.empty{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:16px;padding:20px;text-align:center;color:#667085}form{display:inline}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.top{flex-direction:column}}@media(max-width:520px){.grid{grid-template-columns:1fr 1fr}.decision .btn{width:100%;justify-content:center;text-align:center}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><div class="muted">🧠 تحلیل پرونده</div><h1 style="margin:0">{{ case.title|default:'بدون عنوان' }}</h1><div class="muted">{{ case.case_code }}</div></div>
+    <div class="actions"><a class="btn secondary" href="{% url 'portal:dashboard' %}">داشبورد</a><a class="btn secondary" href="{% url 'portal:case-repository' case.case_code %}">📁 مخزن پرونده</a></div>
+  </div>
+
+  <section class="hero">
+    <div class="muted">نتیجه آخرین تحلیل</div>
+    <h1>تصمیم بعدی با شماست</h1>
+    <div class="grid">
+      <div class="stat"><span>اطلاعات قابل استفاده</span><b>{{ summary.usable_facts }}</b></div>
+      <div class="stat"><span>موارد متناقض</span><b>{{ summary.conflicts }}</b></div>
+      <div class="stat"><span>موارد نامعتبر</span><b>{{ summary.invalid }}</b></div>
+      <div class="stat"><span>موارد پیدا نشده</span><b>{{ summary.missing }}</b></div>
+    </div>
+  </section>
+
+  <div class="card">
+    <h2 style="margin-top:0">اقدام بعدی</h2>
+    {% if case.analysis_status == 'not_started' or case.analysis_status == 'failed' %}
+      <p>هنوز تحلیل قابل استفاده‌ای برای این پرونده وجود ندارد.</p>
+      <form method="post" action="{% url 'portal:analysis-start' case.case_code %}">{% csrf_token %}<button class="btn" type="submit">🧠 شروع تحلیل پرونده</button></form>
+    {% elif case.analysis_status == 'queued' or case.analysis_status == 'processing' %}
+      <div class="warnbox">⏳ تحلیل در حال انجام است. چند لحظه بعد این صفحه را دوباره باز کنید.</div>
+    {% elif summary.has_issues %}
+      <p>در مجموع <strong>{{ summary.open_issues }}</strong> مورد نیازمند تصمیم شماست. می‌توانید جزئیات را ببینید، از طریق بله پاسخ دقیق بدهید، یا آگاهانه با اطلاعات فعلی ادامه دهید.</p>
+      <div class="decision">
+        {% if bale_public_url %}<a class="btn" href="{{ bale_public_url }}" rel="noopener">💬 رفع موارد در بله</a>{% endif %}
+        <form method="post" action="{% url 'portal:analysis-continue' case.case_code %}">{% csrf_token %}<button class="btn warn" type="submit">⏭ ادامه با اطلاعات فعلی</button></form>
+        <a class="btn secondary" href="{% url 'portal:case-repository' case.case_code %}">📎 افزودن یا مرور مدارک</a>
+      </div>
+    {% else %}
+      <p>✅ مورد حل‌نشده‌ای باقی نمانده است. اگر آماده هستید گزارش را تولید کنید یا قبل از آن مدارک پرونده را دوباره مرور کنید.</p>
+      <div class="decision">
+        <form method="post" action="{% url 'portal:analysis-generate-report' case.case_code %}">{% csrf_token %}<button class="btn success" type="submit">📄 تولید گزارش</button></form>
+        <a class="btn secondary" href="{% url 'portal:case-repository' case.case_code %}">📎 مرور مدارک</a>
+        {% if report and report.current_revision_id %}<a class="btn" href="{% url 'portal:case-review' case.case_code %}">مشاهده گزارش موجود</a>{% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  {% if issue_rows %}
+  <h2>🧩 موارد نیازمند بررسی</h2>
+  {% for row in issue_rows %}
+  <div class="card issue">
+    <div class="issue-title">{{ row.issue.field.label }}</div>
+    <div style="margin-top:6px">{{ row.reason }}</div>
+    {% if row.issue.resolution_note %}<div class="muted" style="margin-top:6px">پاسخ یا یادداشت قبلی: {{ row.issue.resolution_note }}</div>{% endif %}
+    <div style="margin-top:8px"><span class="badge">تلاش {{ row.issue.attempt_count }}</span></div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty">✅ در تحلیل فعلی مورد بازی برای بررسی وجود ندارد.</div>
+  {% endif %}
+</div>
+</body>
+</html>
