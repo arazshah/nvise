@@ -3,6 +3,7 @@ import uuid
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit.services import record_audit_event
 from apps.subscriptions.models import UsageRecord
 from apps.subscriptions.services import assert_quota, record_usage
 from apps.tenants.models import Tenant
@@ -60,6 +61,15 @@ def create_case(*, user, tenant: Tenant, title: str = "") -> Case:
         actor=user,
         payload={"status": Case.Status.OPEN},
     )
+    record_audit_event(
+        event_type="case.created",
+        tenant=tenant,
+        actor=user,
+        case=case,
+        object_type="case",
+        object_id=case.id,
+        metadata={"case_code": case.case_code, "status": case.status},
+    )
     return case
 
 
@@ -94,6 +104,15 @@ def transition_case(*, case: Case, target_status: str, actor=None) -> Case:
         event_type="case.status_changed",
         actor=actor,
         payload={"from": previous_status, "to": target_status},
+    )
+    record_audit_event(
+        event_type="case.status_changed",
+        tenant=locked.tenant,
+        actor=actor,
+        case=locked,
+        object_type="case",
+        object_id=locked.id,
+        metadata={"from": previous_status, "to": target_status},
     )
     return locked
 
