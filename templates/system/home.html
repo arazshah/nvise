@@ -1,59 +1,106 @@
-{% load static %}
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="نویسه؛ دستیار هوشمند پرونده‌محور برای دریافت صوت، متن و مدارک و تبدیل آن‌ها به گزارش حرفه‌ای قابل بررسی و تأیید.">
-  <title>نویسه | از گفتگو تا گزارش حرفه‌ای</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%232c23a4'/%3E%3Cpath d='M18 16h20a8 8 0 0 1 8 8v10a8 8 0 0 1-8 8h-8l-10 8 2-8h-4a8 8 0 0 1-8-8V24a8 8 0 0 1 8-8Z' fill='white'/%3E%3Cpath d='M25 25h13M25 31h13M25 37h8' stroke='%232c23a4' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="نویسه؛ سامانه هوشمند پرونده‌محور برای نگهداری صوت، تصویر، مدارک و یادداشت‌ها، تحلیل اختیاری و تولید گزارش حرفه‌ای قابل بررسی.">
+  <title>نویسه | پرونده، مدرک، تحلیل و گزارش در یک مسیر</title>
+  <link rel="icon" href="/favicon.ico">
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
   <style>
-    :root{--bg:#06111f;--panel:#0c1a2b;--panel2:#10253c;--text:#f7fbff;--muted:#a8b7ca;--brand:#26d6a4;--brand2:#6e8cff;--line:rgba(255,255,255,.09);--bale:#18c790;--shadow:0 24px 80px rgba(0,0,0,.3);--radius:26px}
-    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;font-family:Vazirmatn,Tahoma,Arial,sans-serif;background:radial-gradient(circle at 10% 8%,rgba(110,140,255,.15),transparent 30%),radial-gradient(circle at 90% 12%,rgba(38,214,164,.12),transparent 26%),var(--bg);color:var(--text);line-height:1.9} a{color:inherit;text-decoration:none} .container{width:min(1160px,calc(100% - 32px));margin:auto}
-    .nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0;gap:20px}.brand{display:flex;align-items:center;gap:12px;font-weight:900}.logo{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#06111f;font-size:1.25rem}.brand small{display:block;color:var(--muted);font-weight:500;font-size:.72rem;line-height:1.2}.nav-links{display:flex;gap:20px;color:var(--muted);font-size:.92rem}.nav-links a:hover{color:#fff}
-    .hero{display:grid;grid-template-columns:1.02fr .98fr;gap:42px;align-items:center;padding:48px 0 78px;min-height:74vh}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:8px 13px;border-radius:999px;color:var(--brand);background:rgba(38,214,164,.08);border:1px solid rgba(38,214,164,.25);font-size:.86rem}h1{font-size:clamp(2.45rem,5.8vw,5.25rem);line-height:1.17;margin:18px 0 20px;letter-spacing:-1.7px}.gradient{background:linear-gradient(90deg,var(--brand),var(--brand2));-webkit-background-clip:text;color:transparent}.lead{font-size:1.12rem;color:var(--muted);max-width:720px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}.btn{min-height:50px;padding:0 20px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;gap:9px;font-weight:800;border:1px solid var(--line);transition:.2s ease}.btn:hover{transform:translateY(-2px)}.btn-primary{background:linear-gradient(135deg,var(--brand),#35c99e);color:#06111f;border:0}.btn-bale{background:linear-gradient(135deg,#20d39a,#13b980);color:#041612;border:0;box-shadow:0 12px 38px rgba(24,199,144,.18)}.btn-secondary{background:rgba(255,255,255,.04)}
-    .hero-visual{position:relative}.hero-image-wrap{position:relative;border-radius:34px;padding:10px;background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.02));border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden}.hero-image{width:100%;display:block;border-radius:26px;aspect-ratio:1/1;object-fit:cover;background:rgba(255,255,255,.03)}.bale-badge{position:absolute;right:-10px;bottom:28px;background:rgba(7,17,31,.92);backdrop-filter:blur(16px);border:1px solid rgba(38,214,164,.28);border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 16px 40px rgba(0,0,0,.28)}.bale-dot{width:36px;height:36px;border-radius:12px;background:var(--bale);display:grid;place-items:center;font-size:1.15rem}.bale-badge strong{display:block}.bale-badge span{color:var(--muted);font-size:.78rem}
-    .notice{margin-top:14px;color:#f5cc7d;font-size:.85rem}section{padding:78px 0}.section-head{margin-bottom:30px}.section-head h2{font-size:clamp(1.85rem,4vw,3rem);margin:0 0 8px}.section-head p{margin:0;color:var(--muted);max-width:780px}.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.card{background:rgba(12,26,43,.74);border:1px solid var(--line);border-radius:var(--radius);padding:24px;box-shadow:0 14px 38px rgba(0,0,0,.12)}.num{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:var(--brand);color:#06111f;font-weight:900;margin-bottom:17px}.card h3{margin:0 0 8px}.card p{margin:0;color:var(--muted);font-size:.95rem}
-    .bale-section{display:grid;grid-template-columns:.9fr 1.1fr;gap:24px;align-items:center}.bale-panel{background:linear-gradient(145deg,rgba(24,199,144,.11),rgba(110,140,255,.08));border:1px solid rgba(24,199,144,.2);border-radius:30px;padding:28px}.bale-panel h2{margin-top:0}.steps{display:grid;gap:12px;margin-top:18px}.step{display:flex;gap:13px;align-items:flex-start;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:17px;padding:14px}.step i{font-style:normal;width:34px;height:34px;border-radius:11px;background:rgba(24,199,144,.14);display:grid;place-items:center;color:var(--brand);font-weight:900;flex:0 0 auto}.step strong{display:block}.step span{color:var(--muted);font-size:.9rem}
-    .flow{display:grid;gap:12px}.flow-row{display:grid;grid-template-columns:58px 1fr auto;align-items:center;gap:16px;padding:17px 18px;border-radius:18px;background:rgba(255,255,255,.035);border:1px solid var(--line)}.flow-icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:rgba(110,140,255,.13);font-weight:900}.flow-title{font-weight:900}.flow-desc{color:var(--muted);font-size:.9rem}.arrow{color:var(--brand);font-size:1.2rem}code{direction:ltr;display:inline-block;background:#081524;border:1px solid var(--line);color:var(--brand);padding:4px 8px;border-radius:9px;font-family:Consolas,monospace}.commands{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.command{display:flex;gap:14px;align-items:flex-start}.cta{border-radius:30px;padding:36px;border:1px solid rgba(38,214,164,.2);background:linear-gradient(135deg,rgba(38,214,164,.11),rgba(110,140,255,.10));display:flex;align-items:center;justify-content:space-between;gap:24px}.cta h2{margin:0 0 8px}.cta p{margin:0;color:var(--muted)}footer{border-top:1px solid var(--line);color:var(--muted);padding:30px 0 45px;font-size:.88rem}
-    @media(max-width:900px){.hero,.bale-section{grid-template-columns:1fr}.hero{padding-top:30px}.grid-3{grid-template-columns:1fr}.commands{grid-template-columns:1fr}.nav-links{display:none}.flow-row{grid-template-columns:48px 1fr}.arrow{display:none}.cta{flex-direction:column;align-items:flex-start}.bale-badge{right:12px}}
+    :root{--bg:#07111f;--panel:#0d1b2d;--soft:#12243a;--text:#f7fbff;--muted:#a9b7c9;--green:#2bd6a4;--blue:#748cff;--line:rgba(255,255,255,.09);--gold:#f0c776;--radius:24px;--shadow:0 24px 70px rgba(0,0,0,.28)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Vazirmatn,Tahoma,sans-serif;background:radial-gradient(circle at 12% 0,rgba(116,140,255,.14),transparent 28%),radial-gradient(circle at 88% 5%,rgba(43,214,164,.12),transparent 24%),var(--bg);color:var(--text);line-height:1.95}a{color:inherit;text-decoration:none}.container{width:min(1180px,calc(100% - 32px));margin:auto}.nav{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:19px 0}.brand{display:flex;align-items:center;gap:11px;font-size:20px;font-weight:900}.logo{width:43px;height:43px;border-radius:14px;background:linear-gradient(135deg,var(--green),var(--blue));display:grid;place-items:center;color:#07111f}.brand small{display:block;font-size:11px;color:var(--muted);font-weight:500;line-height:1.2}.navlinks{display:flex;align-items:center;gap:17px;color:var(--muted);font-size:14px}.navlinks a:hover{color:#fff}.nav-cta{padding:9px 14px;border:1px solid rgba(43,214,164,.25);border-radius:11px;color:var(--green)!important;background:rgba(43,214,164,.06)}
+    .hero{padding:64px 0 72px;display:grid;grid-template-columns:1.04fr .96fr;gap:40px;align-items:center}.eyebrow{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(43,214,164,.25);background:rgba(43,214,164,.07);color:var(--green);border-radius:999px;padding:7px 12px;font-size:13px}.hero h1{font-size:clamp(2.5rem,6vw,5rem);line-height:1.2;letter-spacing:-1.6px;margin:18px 0}.grad{background:linear-gradient(90deg,var(--green),var(--blue));-webkit-background-clip:text;color:transparent}.lead{font-size:18px;color:var(--muted);max-width:720px}.actions{display:flex;flex-wrap:wrap;gap:11px;margin-top:27px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 19px;border-radius:13px;border:1px solid var(--line);font-weight:800;transition:.2s}.btn:hover{transform:translateY(-2px)}.primary{background:linear-gradient(135deg,var(--green),#27c493);color:#05120f;border:0}.secondary{background:rgba(255,255,255,.035)}.micro{color:#8494aa;font-size:12px;margin-top:12px}
+    .mock{background:linear-gradient(145deg,rgba(255,255,255,.1),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:30px;padding:12px;box-shadow:var(--shadow)}.phone{background:#eff3f8;border-radius:23px;color:#172033;padding:18px;min-height:475px;position:relative;overflow:hidden}.phone-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #dfe5ee;padding-bottom:13px;font-weight:900}.bubble{background:#fff;border-radius:17px;padding:13px 15px;margin:15px 0;box-shadow:0 6px 20px rgba(28,39,70,.08);font-size:13px;line-height:1.8}.bubble.bot{background:#e8fbf4;margin-left:34px}.bubble.user{margin-right:42px}.keys{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:15px}.key{background:#fff;border:1px solid #dde4ee;border-radius:11px;padding:9px;text-align:center;font-size:12px;font-weight:800}.key.full{grid-column:1/-1}.panel-chip{position:absolute;left:18px;bottom:18px;background:#172033;color:#fff;border-radius:14px;padding:11px 14px;font-size:12px;box-shadow:0 10px 28px rgba(0,0,0,.18)}
+    section{padding:72px 0}.head{margin-bottom:25px}.head h2{font-size:clamp(1.9rem,4vw,3rem);margin:0 0 8px}.head p{margin:0;color:var(--muted);max-width:800px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{background:rgba(13,27,45,.78);border:1px solid var(--line);border-radius:var(--radius);padding:23px}.card .ico{font-size:27px;margin-bottom:13px}.card h3{margin:0 0 7px}.card p{color:var(--muted);margin:0;font-size:14px}.flow{display:grid;gap:11px}.flow-row{display:grid;grid-template-columns:48px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);background:rgba(255,255,255,.027);padding:16px;border-radius:17px}.step{width:42px;height:42px;border-radius:13px;background:rgba(116,140,255,.13);display:grid;place-items:center;color:#aebaff;font-weight:900}.flow-row strong{display:block}.flow-row span{color:var(--muted);font-size:13px}.arrow{color:var(--green)}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:18px}.featurebox{border-radius:27px;border:1px solid var(--line);background:linear-gradient(145deg,rgba(43,214,164,.08),rgba(116,140,255,.06));padding:27px}.featurebox h2{margin-top:0}.list{display:grid;gap:10px}.item{display:flex;gap:11px;align-items:flex-start;background:rgba(255,255,255,.035);padding:13px;border-radius:14px}.item i{font-style:normal}.item span{color:var(--muted);font-size:13px}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.plan{border:1px solid var(--line);background:rgba(13,27,45,.72);border-radius:22px;padding:22px}.plan h3{margin:0 0 5px}.price{font-size:26px;font-weight:900;margin:13px 0}.price small{font-size:12px;color:var(--muted);font-weight:500}.plan ul{padding:0 18px 0 0;color:var(--muted);font-size:13px}.note{border:1px solid rgba(240,199,118,.22);background:rgba(240,199,118,.06);color:#f3dcae;border-radius:15px;padding:13px 16px;margin-top:16px;font-size:13px}
+    .creator{display:flex;align-items:center;justify-content:space-between;gap:22px;background:linear-gradient(135deg,rgba(116,140,255,.12),rgba(43,214,164,.09));border:1px solid var(--line);padding:27px;border-radius:27px}.creator p{color:var(--muted);margin:6px 0 0}.support{display:flex;gap:10px;flex-wrap:wrap}.pill{padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.035)}footer{border-top:1px solid var(--line);padding:27px 0 42px;color:var(--muted);font-size:12px}.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+    @media(max-width:900px){.hero,.split{grid-template-columns:1fr}.grid3,.plans{grid-template-columns:1fr}.navlinks{display:none}.hero{padding-top:34px}.creator{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.keys{grid-template-columns:1fr}.key.full{grid-column:auto}.flow-row{grid-template-columns:42px 1fr}.arrow{display:none}.actions .btn{width:100%}.phone{min-height:430px}.creator{padding:20px}}
   </style>
 </head>
 <body>
-<header class="container"><nav class="nav" aria-label="ناوبری اصلی"><a class="brand" href="/"><span class="logo">ن</span><span>نویسه<small>Nvise · Smart Case Assistant</small></span></a><div class="nav-links"><a href="#bale">شروع در بله</a><a href="#how">چطور کار می‌کند؟</a><a href="#guide">راهنمای کاربر</a><a href="#features">قابلیت‌ها</a></div></nav></header>
-<main>
-  <div class="container hero">
-    <div>
-      <span class="eyebrow">● دستیار هوشمند پرونده‌محور</span>
-      <h1>گفتگو کن، مدرک بفرست؛<br><span class="gradient">گزارش حرفه‌ای تحویل بگیر.</span></h1>
-      <p class="lead">نویسه داخل پیام‌رسان بله کنار کاربر قرار می‌گیرد. متن، صوت، تصویر و فایل را دریافت می‌کند، اطلاعات مهم را استخراج می‌کند، ابهام‌ها را می‌پرسد و در پایان گزارش ساختاریافته و قابل بازبینی می‌سازد.</p>
-      <div class="actions">{% if bale_public_url %}<a class="btn btn-bale" href="{{ bale_public_url }}" target="_blank" rel="noopener">💬 شروع در پیام‌رسان بله</a>{% else %}<a class="btn btn-bale" href="#bale">💬 نحوه شروع در بله</a>{% endif %}<a class="btn btn-secondary" href="#how">روال کار را ببینید</a></div>
-      {% if not bale_public_url %}<div class="notice">لینک عمومی ربات بله هنوز توسط مدیر سامانه ثبت نشده است.</div>{% endif %}
+<header class="container">
+  <nav class="nav">
+    <a class="brand" href="/"><span class="logo">ن</span><span>نویسه<small>Nvise · Smart Case Workspace</small></span></a>
+    <div class="navlinks">
+      <a href="#workflow">نحوه کار</a>
+      <a href="#features">قابلیت‌ها</a>
+      <a href="/guide/">راهنمای کامل</a>
+      {% if show_billing_portal %}<a href="#plans">پلن‌ها</a>{% endif %}
+      {% if bale_public_url %}<a class="nav-cta" href="{{ bale_public_url }}" target="_blank" rel="noopener">شروع در بله</a>{% endif %}
     </div>
-    <div class="hero-visual"><div class="hero-image-wrap"><img class="hero-image" id="bale-hero" src="" alt="نمایش استفاده از نویسه در پیام‌رسان بله برای دریافت صوت، فایل و ساخت گزارش حرفه‌ای"></div><div class="bale-badge"><div class="bale-dot">💬</div><div><strong>نویسه در بله</strong><span>ورودی اصلی محصول همین‌جاست</span></div></div></div>
-  </div>
-  <section id="bale"><div class="container bale-section"><div><div class="section-head"><h2>کار اصلی در پیام‌رسان بله انجام می‌شود</h2><p>وب‌سایت برای معرفی و راهنمایی است؛ تجربه روزمره کاربر از داخل ربات بله آغاز می‌شود.</p></div>{% if bale_public_url %}<a class="btn btn-bale" href="{{ bale_public_url }}" target="_blank" rel="noopener">باز کردن ربات نویسه در بله ←</a>{% endif %}</div><div class="bale-panel"><h2>در کمتر از یک دقیقه شروع کنید</h2><div class="steps"><div class="step"><i>1</i><div><strong>ربات را در بله باز کنید</strong><span>روی «شروع» بزنید یا دستور <code>/start</code> را ارسال کنید.</span></div></div><div class="step"><i>2</i><div><strong>پرونده بسازید</strong><span>با <code>/newcase</code> یا دکمه «پرونده جدید» یک پرونده فعال ایجاد کنید.</span></div></div><div class="step"><i>3</i><div><strong>مثل یک گفت‌وگوی عادی اطلاعات بفرستید</strong><span>متن، Voice، فایل، عکس و مدارک مرتبط را ارسال کنید.</span></div></div><div class="step"><i>4</i><div><strong>پایان اطلاعات را اعلام کنید</strong><span>با <code>/finish</code> تحلیل نهایی، سؤال‌های تکمیلی و تولید گزارش شروع می‌شود.</span></div></div></div></div></div></section>
-  <section id="how"><div class="container"><div class="section-head"><h2>روال کار نویسه</h2><p>نویسه فاصله بین اطلاعات پراکنده پرونده و گزارش نهایی قابل اتکا را کم می‌کند.</p></div><div class="flow"><div class="flow-row"><div class="flow-icon">01</div><div><div class="flow-title">ساخت پرونده</div><div class="flow-desc">کاربر در بله پرونده جدید می‌سازد و آن را فعال می‌کند.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">02</div><div><div class="flow-title">ارسال متن، صوت و مدارک</div><div class="flow-desc">ورودی‌ها به پرونده متصل و به‌صورت امن نگهداری می‌شوند.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">03</div><div><div class="flow-title">تبدیل صوت و استخراج هوشمند</div><div class="flow-desc">AvalAI صوت را به متن و اطلاعات را به داده ساختاریافته تبدیل می‌کند.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">04</div><div><div class="flow-title">تشخیص کمبود و تعارض</div><div class="flow-desc">اگر اطلاعات کافی نباشد، نویسه سؤال‌های تکمیلی مشخص می‌پرسد.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">05</div><div><div class="flow-title">ساخت و بازبینی گزارش</div><div class="flow-desc">گزارش در لینک امن وب قابل مشاهده، اصلاح و تأیید است.</div></div><div class="arrow">←</div></div><div class="flow-row"><div class="flow-icon">06</div><div><div class="flow-title">دریافت خروجی نهایی</div><div class="flow-desc">پس از تأیید، فایل DOCX آماده و از طریق بله ارسال می‌شود.</div></div><div class="arrow">✓</div></div></div></div></section>
-  <section id="guide"><div class="container"><div class="section-head"><h2>دستورهای مهم کاربر</h2><p>برای استفاده روزمره همین چند دستور کافی است.</p></div><div class="commands"><div class="card command"><div class="num">1</div><div><h3><code>/start</code></h3><p>شروع کار و نمایش منوی اصلی.</p></div></div><div class="card command"><div class="num">2</div><div><h3><code>/newcase</code></h3><p>ساخت یک پرونده جدید.</p></div></div><div class="card command"><div class="num">3</div><div><h3><code>/status</code></h3><p>مشاهده وضعیت پرونده فعال.</p></div></div><div class="card command"><div class="num">4</div><div><h3><code>/cases</code></h3><p>نمایش پرونده‌های باز.</p></div></div><div class="card command"><div class="num">5</div><div><h3><code>/active CASE_CODE</code></h3><p>فعال کردن یک پرونده مشخص.</p></div></div><div class="card command"><div class="num">6</div><div><h3><code>/finish</code></h3><p>پایان ورود اولیه اطلاعات و شروع تحلیل نهایی.</p></div></div></div></div></section>
-  <section id="features"><div class="container"><div class="section-head"><h2>چرا نویسه؟</h2><p>طراحی نویسه بر پایه «پرونده + شواهد + گزارش قابل تأیید» است.</p></div><div class="grid-3"><div class="card"><div class="num">A</div><h3>ورودی طبیعی</h3><p>به‌جای فرم‌های طولانی، کاربر می‌تواند توضیح بدهد، Voice بفرستد و مدارک را همان‌جا ارسال کند.</p></div><div class="card"><div class="num">B</div><h3>ردیابی منبع اطلاعات</h3><p>هر واقعیت استخراج‌شده به پیام یا بخش مرتبط از متن پیاده‌شده متصل می‌شود.</p></div><div class="card"><div class="num">C</div><h3>انسان در حلقه تصمیم</h3><p>هوش مصنوعی گزارش را آماده می‌کند، اما متخصص نسخه نهایی را بازبینی و تأیید می‌کند.</p></div></div></div></section>
-  <section><div class="container"><div class="cta"><div><h2>برای شروع فقط یک پرونده واقعی بسازید.</h2><p>ربات نویسه را در بله باز کنید، <code>/newcase</code> را بزنید و اطلاعات را مثل یک گفت‌وگوی عادی ارسال کنید.</p></div>{% if bale_public_url %}<a class="btn btn-bale" href="{{ bale_public_url }}" target="_blank" rel="noopener">شروع در بله</a>{% else %}<a class="btn btn-secondary" href="#bale">مطالعه راهنما</a>{% endif %}</div></div></section>
+  </nav>
+</header>
+<main>
+  <section class="container hero">
+    <div>
+      <span class="eyebrow">● پرونده‌محور، امن و قابل بازبینی</span>
+      <h1>پرونده‌ات را نگه دار؛<br><span class="grad">هر وقت خواستی تحلیلش کن.</span></h1>
+      <p class="lead">نویسه فقط یک «تولیدکننده گزارش» نیست. هر پرونده یک مخزن واقعی برای صوت، تصویر، مدرک و یادداشت است. می‌توانید مدت‌ها فقط اطلاعات را جمع کنید، بعد در زمان مناسب تحلیل را شروع کنید، ابهام‌ها را مدیریت کنید و در صورت نیاز گزارش حرفه‌ای بسازید.</p>
+      <div class="actions">
+        {% if bale_public_url %}<a class="btn primary" href="{{ bale_public_url }}" target="_blank" rel="noopener">💬 شروع در ربات بله</a>{% else %}<a class="btn primary" href="/guide/">📘 مشاهده راهنمای شروع</a>{% endif %}
+        <a class="btn secondary" href="/guide/">راهنمای کامل نویسه</a>
+      </div>
+      <div class="micro">بدون نیاز به حفظ دستور؛ مسیر اصلی با دکمه‌های فارسی انجام می‌شود.</div>
+    </div>
+    <div class="mock" aria-label="نمونه تجربه نویسه در بله">
+      <div class="phone">
+        <div class="phone-head"><span>نویسه</span><span>● آنلاین</span></div>
+        <div class="bubble bot">پرونده فعال شما آماده است. می‌توانید متن، صوت، تصویر یا مدرک بفرستید و هر زمان خواستید تحلیل را شروع کنید.</div>
+        <div class="bubble user">🎙 یک پیام صوتی و قرارداد را به پرونده اضافه کردم.</div>
+        <div class="bubble bot">✅ اطلاعات ذخیره شد. تحلیل اجباری نیست و پرونده می‌تواند فقط به‌عنوان مخزن باقی بماند.</div>
+        <div class="keys">
+          <div class="key">🧠 تحلیل پرونده</div><div class="key">📂 پرونده‌های من</div>
+          <div class="key">➕ پرونده جدید</div><div class="key">📊 وضعیت پرونده</div>
+          <div class="key full">🌐 ورود امن به پنل نویسه</div>
+        </div>
+        <div class="panel-chip">🔐 ورود یک‌بارمصرف به پنل وب</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="workflow"><div class="container">
+    <div class="head"><h2>مسیر واقعی کار در نویسه</h2><p>جریان جدید طوری طراحی شده که کاربر هیچ‌وقت در یک پرونده گیر نکند و تحلیل، گزارش و بایگانی تصمیم‌های مستقل باشند.</p></div>
+    <div class="flow">
+      <div class="flow-row"><div class="step">01</div><div><strong>ساخت یا انتخاب پرونده</strong><span>از منوی بله پرونده جدید بسازید یا یکی از پرونده‌های قبلی را فعال کنید.</span></div><div class="arrow">←</div></div>
+      <div class="flow-row"><div class="step">02</div><div><strong>جمع‌آوری محتوا</strong><span>متن، Voice، فایل، تصویر و یادداشت داخل مخزن دائمی همان پرونده ذخیره می‌شود.</span></div><div class="arrow">←</div></div>
+      <div class="flow-row"><div class="step">03</div><div><strong>تحلیل فقط وقتی شما بخواهید</strong><span>با «🧠 تحلیل پرونده» اطلاعات قابل استفاده، کمبودها و تناقض‌ها استخراج می‌شوند.</span></div><div class="arrow">←</div></div>
+      <div class="flow-row"><div class="step">04</div><div><strong>اول نتیجه، بعد تصمیم</strong><span>قبل از هر سؤال یا گزارش، خلاصه تحلیل نمایش داده می‌شود؛ رفع موارد، افزودن مدرک یا ادامه با اطلاعات فعلی انتخاب شماست.</span></div><div class="arrow">←</div></div>
+      <div class="flow-row"><div class="step">05</div><div><strong>گزارش قابل بررسی و شفاف</strong><span>گزارش فقط با تصمیم صریح شما ساخته می‌شود و موارد نامشخص/در دسترس‌نبوده نیز داخل آن ثبت می‌شوند.</span></div><div class="arrow">←</div></div>
+      <div class="flow-row"><div class="step">06</div><div><strong>پنل وب، بایگانی و بازگشایی</strong><span>با Magic Link یک‌بارمصرف وارد Dashboard شوید، مخزن و گزارش را ببینید، پرونده را بایگانی یا دوباره باز کنید.</span></div></div>
+    </div>
+  </div></section>
+
+  <section id="features"><div class="container">
+    <div class="head"><h2>یک پرونده، یک فضای کاری کامل</h2><p>بله برای ثبت سریع اطلاعات و تصمیم‌های روزمره است؛ پنل وب برای مرور دقیق، آرشیو، تحلیل و گزارش.</p></div>
+    <div class="grid3">
+      <div class="card"><div class="ico">📁</div><h3>مخزن واقعی پرونده</h3><p>صوت، تصویر، مدرک، یادداشت، transcript، تحلیل و گزارش در context همان پرونده باقی می‌مانند.</p></div>
+      <div class="card"><div class="ico">🧠</div><h3>تحلیل کنترل‌شده</h3><p>تحلیل اجباری نیست. نتیجه ابتدا خلاصه می‌شود و سیستم بدون تصمیم شما وارد چرخه سؤال یا تولید گزارش نمی‌شود.</p></div>
+      <div class="card"><div class="ico">🧩</div><h3>ابهام بدون حلقه تکرار</h3><p>دلیل ابهام و پاسخ قبلی نمایش داده می‌شود؛ «اطلاعات در دسترس نیست» و «ادامه با اطلاعات فعلی» پایان رسمی مسئله‌اند.</p></div>
+      <div class="card"><div class="ico">📑</div><h3>گزارش با محدودیت‌های شفاف</h3><p>حتی با اطلاعات ناقص می‌توان گزارش ساخت؛ موارد نامشخص در بخش مستقل گزارش و DOCX ثبت می‌شوند.</p></div>
+      <div class="card"><div class="ico">🔐</div><h3>ورود امن از بله</h3><p>Magic Link کوتاه‌عمر و یک‌بارمصرف، بدون نیاز به حفظ نام کاربری یا رمز عبور برای دسترسی به پنل شخصی.</p></div>
+      <div class="card"><div class="ico">🔄</div><h3>آزادانه بین پرونده‌ها حرکت کنید</h3><p>در هر مرحله می‌توانید به منوی اصلی برگردید، پرونده دیگری را باز کنید یا پرونده جدید بسازید؛ پرونده قبلی محفوظ می‌ماند.</p></div>
+    </div>
+  </div></section>
+
+  <section><div class="container split">
+    <div class="featurebox"><h2>💬 بله برای کار سریع</h2><div class="list"><div class="item"><i>➕</i><div><strong>ساخت پرونده</strong><br><span>بدون command و فقط با دکمه.</span></div></div><div class="item"><i>🎙</i><div><strong>ارسال محتوا</strong><br><span>متن، صوت، تصویر و فایل در همان پرونده ذخیره می‌شوند.</span></div></div><div class="item"><i>🧠</i><div><strong>شروع تحلیل و تصمیم‌ها</strong><br><span>نتیجه تحلیل، رفع موارد و تولید گزارش از همان گفتگو قابل کنترل است.</span></div></div><div class="item"><i>🏠</i><div><strong>همیشه راه خروج دارید</strong><br><span>منوی اصلی، پرونده جدید و پرونده‌های من در جریان‌های مهم در دسترس‌اند.</span></div></div></div></div>
+    <div class="featurebox"><h2>🌐 وب برای مرور عمیق</h2><div class="list"><div class="item"><i>📊</i><div><strong>Dashboard شخصی</strong><br><span>پرونده‌های فعال، بایگانی‌شده و موارد نیازمند اقدام در یک نما.</span></div></div><div class="item"><i>📁</i><div><strong>مخزن و دانلود امن</strong><br><span>فایل‌ها از storage خصوصی و فقط پس از بررسی مجوز کاربر ارائه می‌شوند.</span></div></div><div class="item"><i>📑</i><div><strong>بررسی و تأیید گزارش</strong><br><span>ویرایش نسخه، مرور محدودیت‌ها و دریافت DOCX نهایی.</span></div></div><div class="item"><i>💳</i><div><strong>اشتراک و مصرف</strong><br><span>پلن، محدودیت‌ها و مصرف حساب در پنل نمایش داده می‌شود؛ پرداخت آنلاین در مرحله اتصال زیبال است.</span></div></div></div></div>
+  </div></section>
+
+  {% if show_billing_portal %}<section id="plans"><div class="container">
+    <div class="head"><h2>پلن‌ها و ظرفیت استفاده</h2><p>پلن‌ها و محدودیت‌های زیر مستقیماً از تنظیمات مدیریتی نویسه خوانده می‌شوند و ممکن است با تصمیم مدیر سامانه تغییر کنند.</p></div>
+    {% if plans %}<div class="plans">{% for plan in plans %}<div class="plan"><h3>{{ plan.name }}</h3><div class="price">{{ plan.monthly_price|floatformat:0 }} <small>{{ plan.currency }} / ماه</small></div><ul><li>تا {{ plan.max_cases_per_period }} پرونده در هر دوره</li><li>تا {{ plan.max_stt_seconds_per_period }} ثانیه تبدیل صوت به متن</li><li>تا {{ plan.max_ai_extractions_per_period }} تحلیل هوشمند</li><li>تا {{ plan.max_members }} عضو</li></ul></div>{% endfor %}</div>{% else %}<div class="card">هنوز پلن عمومی فعالی از سوی مدیر سامانه تعریف نشده است.</div>{% endif %}
+    <div class="note">💳 {{ billing_notice }} در حال حاضر هیچ دکمه پرداختی تا زمان تکمیل اتصال واقعی و امن درگاه نمایش داده نمی‌شود.</div>
+  </div></section>{% endif %}
+
+  <section><div class="container creator">
+    <div><div class="eyebrow">سازنده و پشتیبانی</div><h2 style="margin:10px 0 0">نویسه توسط {{ creator_name }} توسعه داده می‌شود</h2><p>برای آشنایی بیشتر با سازنده، پروژه‌ها و حوزه فعالیت می‌توانید به وب‌سایت شخصی مراجعه کنید. برای پشتیبانی فنی و ارتباط درباره نویسه نیز ایمیل زیر در دسترس است.</p></div>
+    <div class="support"><a class="pill" href="{{ creator_url }}" target="_blank" rel="noopener">🌐 {{ creator_url }}</a><a class="pill" href="mailto:{{ support_email }}">✉️ {{ support_email }}</a></div>
+  </div></section>
+
+  <section><div class="container" style="text-align:center"><div class="head"><h2>برای شروع، فقط ربات را باز کنید</h2><p style="margin:auto">اگر اولین بار است از نویسه استفاده می‌کنید، راهنمای جدید قدم‌به‌قدم همه مسیرها و حالت‌ها را توضیح می‌دهد.</p></div><div class="actions" style="justify-content:center">{% if bale_public_url %}<a class="btn primary" href="{{ bale_public_url }}" target="_blank" rel="noopener">💬 شروع در بله</a>{% endif %}<a class="btn secondary" href="/guide/">📘 مطالعه راهنمای کامل</a></div></div></section>
 </main>
-<footer><div class="container">© نویسه — Nvise · دستیار هوشمند پرونده‌محور برای تبدیل اطلاعات پراکنده به گزارش ساختاریافته و قابل تأیید.</div></footer>
-<script>
-(async function(){
-  const img=document.getElementById('bale-hero');
-  if(!img) return;
-  const parts=[
-    "{% static 'nvise/hero-0.txt' %}","{% static 'nvise/hero-1.txt' %}","{% static 'nvise/hero-2.txt' %}",
-    "{% static 'nvise/hero-3.txt' %}","{% static 'nvise/hero-4.txt' %}","{% static 'nvise/hero-5.txt' %}","{% static 'nvise/hero-6.txt' %}"
-  ];
-  try {
-    const chunks=await Promise.all(parts.map(url=>fetch(url).then(r=>{if(!r.ok) throw new Error('asset'); return r.text();})));
-    img.src='data:image/webp;base64,'+chunks.join('').trim();
-  } catch(e) {
-    img.alt='نویسه؛ دستیار هوشمند گزارش‌سازی در پیام‌رسان بله';
-  }
-})();
-</script>
-</body></html>
+<footer><div class="container foot"><span>© نویسه — مدیریت هوشمند پرونده و گزارش</span><span>ساخته‌شده توسط <a href="{{ creator_url }}" target="_blank" rel="noopener">{{ creator_name }}</a> · پشتیبانی: <a href="mailto:{{ support_email }}">{{ support_email }}</a></span></div></footer>
+</body>
+</html>
