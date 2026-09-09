@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>اشتراک و مصرف | نویسه</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif}.nav{height:70px;background:#fff;border-bottom:1px solid #e6eaf2;display:flex;align-items:center;justify-content:space-between;padding:0 max(18px,calc((100vw - 1120px)/2))}.brand{font-weight:900;font-size:21px}.nav a{text-decoration:none;color:#526075;font-size:13px;margin-right:10px}.wrap{max-width:1120px;margin:auto;padding:32px 18px 62px}.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:24px}.hero h1{margin:0 0 7px;font-size:29px}.hero p{margin:0;color:#667085;line-height:2}.back{background:#172033;color:#fff!important;padding:10px 14px;border-radius:11px;white-space:nowrap}.grid{display:grid;grid-template-columns:1.05fr .95fr;gap:16px}.card{background:#fff;border:1px solid #e5eaf2;border-radius:20px;padding:21px;box-shadow:0 8px 28px rgba(28,39,70,.04)}.card h2{font-size:18px;margin:0 0 14px}.plan-name{font-size:25px;font-weight:900}.status{display:inline-block;background:#edf9f5;color:#167a5d;border-radius:999px;padding:5px 9px;font-size:12px;margin-top:8px}.muted{color:#667085;font-size:13px;line-height:1.9}.facts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:17px}.fact{background:#f7f9fc;border:1px solid #edf0f5;border-radius:12px;padding:12px}.fact strong{display:block;font-size:17px}.fact span{color:#667085;font-size:11px}.usage{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:16px 0 26px}.meter{background:#fff;border:1px solid #e5eaf2;border-radius:16px;padding:16px}.meter .n{font-size:24px;font-weight:900}.meter .l{font-size:11px;color:#667085;margin-top:5px}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.plan{background:#fff;border:1px solid #e5eaf2;border-radius:18px;padding:18px}.plan h3{margin:0}.price{font-size:22px;font-weight:900;margin:11px 0}.price small{font-size:11px;color:#667085}.plan ul{margin:0;padding-right:17px;color:#667085;font-size:12px;line-height:2}.notice{margin-top:18px;border-radius:16px;padding:15px 17px;background:#fff8e9;border:1px solid #f2dfb2;color:#74561d;font-size:13px;line-height:1.9}.ready{background:#eef7ff;border-color:#d7eaff;color:#36546f}.disabled{background:#f6f7f9;border-color:#e3e7ed;color:#667085}.support{margin-top:23px;text-align:center;color:#667085;font-size:12px}.support a{color:#3448a5;text-decoration:none}@media(max-width:900px){.grid{grid-template-columns:1fr}.usage{grid-template-columns:1fr 1fr}.plans{grid-template-columns:1fr}}@media(max-width:560px){.hero{flex-direction:column}.usage{grid-template-columns:1fr}.facts{grid-template-columns:1fr}.nav .links{display:none}}
+  </style>
+</head>
+<body>
+<nav class="nav"><div class="brand">نویسه</div><div class="links"><a href="{% url 'portal:dashboard' %}">داشبورد</a><a href="{% url 'portal:case-list' %}">پرونده‌ها</a><a href="/guide/">راهنما</a><a href="/">صفحه اصلی</a></div></nav>
+<main class="wrap">
+  <section class="hero"><div><h1>💳 اشتراک و مصرف</h1><p>وضعیت پلن، دوره جاری، میزان استفاده و پلن‌های قابل ارائه از تنظیمات مدیریتی نویسه خوانده می‌شوند.</p></div><a class="back" href="{% url 'portal:dashboard' %}">بازگشت به داشبورد</a></section>
+
+  {% if not billing_visible %}
+    <div class="card"><h2>بخش اشتراک فعلاً غیرفعال است</h2><p class="muted">مدیر سامانه نمایش عمومی اطلاعات اشتراک را غیرفعال کرده است. برای اطلاعات بیشتر با پشتیبانی تماس بگیرید.</p></div>
+  {% else %}
+    <div class="grid">
+      <section class="card">
+        <h2>پلن فعلی</h2>
+        {% if subscription and plan %}
+          <div class="plan-name">{{ plan.name }}</div><span class="status">{{ subscription_status_label }}</span>
+          <div class="facts"><div class="fact"><strong>{{ plan.monthly_price|floatformat:0 }}</strong><span>{{ plan.currency }} در ماه</span></div><div class="fact"><strong>{{ tenant.name }}</strong><span>حساب / فضای کاری</span></div><div class="fact"><strong>{{ period_start|date:'Y/m/d' }}</strong><span>شروع دوره</span></div><div class="fact"><strong>{{ period_end|date:'Y/m/d' }}</strong><span>پایان دوره</span></div></div>
+        {% else %}
+          <div class="plan-name">بدون پلن فعال</div><p class="muted">برای این حساب اشتراک فعالی پیدا نشد. پلن‌ها پایین صفحه نمایش داده می‌شوند.</p>
+        {% endif %}
+      </section>
+      <section class="card">
+        <h2>وضعیت پرداخت آنلاین</h2>
+        <p class="muted">ارائه‌دهنده تنظیم‌شده: <strong>{{ payment_provider_label }}</strong></p>
+        {% if online_payment_enabled and merchant_configured %}<div class="notice ready">✅ تنظیمات مدیریتی پرداخت آنلاین فعال شده است؛ با این حال تا زمان اضافه‌شدن endpointهای پرداخت و verify در نویسه، هیچ عملیات مالی از این صفحه انجام نمی‌شود.</div>{% elif online_payment_enabled %}<div class="notice">⚠️ پرداخت آنلاین در Admin فعال است اما Merchant ارائه‌دهنده هنوز تنظیم نشده؛ پرداخت از پنل قابل انجام نیست.</div>{% else %}<div class="notice disabled">💡 {{ billing_notice }}<br>فعال‌سازی خرید/تمدید فقط بعد از تکمیل اتصال امن درگاه انجام خواهد شد.</div>{% endif %}
+      </section>
+    </div>
+
+    <h2 style="margin:30px 0 10px">مصرف دوره جاری</h2>
+    <section class="usage">
+      <div class="meter"><div class="n">{{ usage_cases|floatformat:0 }}</div><div class="l">پرونده ایجادشده{% if plan %} از {{ plan.max_cases_per_period }}{% endif %}</div></div>
+      <div class="meter"><div class="n">{{ usage_stt|floatformat:0 }}</div><div class="l">ثانیه تبدیل صوت به متن{% if plan %} از {{ plan.max_stt_seconds_per_period }}{% endif %}</div></div>
+      <div class="meter"><div class="n">{{ usage_ai|floatformat:0 }}</div><div class="l">تحلیل هوشمند{% if plan %} از {{ plan.max_ai_extractions_per_period }}{% endif %}</div></div>
+      <div class="meter"><div class="n">{{ usage_docs|floatformat:0 }}</div><div class="l">سند تولیدشده</div></div>
+    </section>
+
+    <h2 style="margin:30px 0 10px">پلن‌های فعال سامانه</h2>
+    {% if plans %}<section class="plans">{% for item in plans %}<article class="plan"><h3>{{ item.name }}</h3><div class="price">{{ item.monthly_price|floatformat:0 }} <small>{{ item.currency }} / ماه</small></div><ul><li>{{ item.max_cases_per_period }} پرونده در دوره</li><li>{{ item.max_stt_seconds_per_period }} ثانیه STT</li><li>{{ item.max_ai_extractions_per_period }} تحلیل هوشمند</li><li>{{ item.max_members }} عضو</li></ul></article>{% endfor %}</section>{% else %}<div class="card muted">پلن فعالی در Admin تعریف نشده است.</div>{% endif %}
+  {% endif %}
+
+  <div class="support">برای پرسش درباره پلن یا پشتیبانی: <a href="mailto:{{ support_email }}">{{ support_email }}</a></div>
+</main>
+</body>
+</html>
