@@ -83,3 +83,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/1")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/2")
+
+BALE_BOT_TOKEN = env("BALE_BOT_TOKEN", default="")
+BALE_BOT_ID = env("BALE_BOT_ID", default="primary")
+BALE_WEBHOOK_SECRET = env("BALE_WEBHOOK_SECRET", default="")
