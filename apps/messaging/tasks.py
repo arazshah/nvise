@@ -1,12 +1,12 @@
 from asgiref.sync import async_to_sync
 from celery import shared_task
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import BaleIdentity
 from apps.subscriptions.services import QuotaExceededError
+from apps.system.integrations import get_bale_config
 from apps.tenants.models import Tenant, TenantMembership
 from apps.tenants.services import MemberLimitExceededError, add_tenant_member
 
@@ -70,7 +70,10 @@ def _finish_non_retryable(inbound, provider, message, exc: Exception) -> None:
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def process_bale_update(self, inbound_update_id: str) -> None:
     inbound = InboundUpdate.objects.get(pk=inbound_update_id)
-    provider = BaleProvider(settings.BALE_BOT_TOKEN)
+    config = get_bale_config()
+    if not config.enabled or not config.bot_token:
+        raise RuntimeError("Bale integration is disabled or Bot Token is not configured")
+    provider = BaleProvider(config.bot_token)
     normalized = provider.parse_update(inbound.payload)
 
     if normalized.message is None:
