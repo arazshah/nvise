@@ -8,6 +8,7 @@ env = environ.Env(
     MAX_PROVIDER_FILE_BYTES=(int, 20 * 1024 * 1024),
     STT_TIMEOUT_SECONDS=(float, 120.0),
     AI_EXTRACTION_TIMEOUT_SECONDS=(float, 120.0),
+    REVIEW_LINK_TTL_MINUTES=(int, 15),
 )
 
 env_file = BASE_DIR / ".env"
@@ -94,6 +95,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "/review/login-required/"
 WEB_BASE_URL = env("WEB_BASE_URL", default="http://localhost:8000").rstrip("/")
+REVIEW_LINK_TTL_MINUTES = env.int("REVIEW_LINK_TTL_MINUTES", default=15)
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
 SECURE_REFERRER_POLICY = "same-origin"
