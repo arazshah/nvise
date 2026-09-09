@@ -28,7 +28,7 @@ def test_portal_magic_link_is_not_consumed_on_preview_and_is_one_time(client):
 
     login_response = client.post(url)
     assert login_response.status_code == 302
-    assert login_response.url == reverse("portal:case-list")
+    assert login_response.url == reverse("portal:dashboard")
     token_row.refresh_from_db()
     assert token_row.consumed_at is not None
     assert client.session.get("_auth_user_id") == str(user.pk)
