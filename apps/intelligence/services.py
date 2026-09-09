@@ -1,0 +1,113 @@
+from typing import Any
+
+from django.db import transaction
+from django.utils import timezone
+
+from apps.cases.models import Case
+from apps.evidence.models import Evidence
+
+from .models import (
+    CaseFieldIssue,
+    ExtractedFact,
+    ExtractionRun,
+    FactEvidence,
+    FieldSchema,
+)
+
+
+def serialize_schema(schema: FieldSchema) -> dict[str, Any]:
+    return {
+        "name": schema.name,
+        "version": schema.version,
+        "vertical": schema.sub_vertical.vertical.key,
+        "sub_vertical": schema.sub_vertical.key,
+        "fields": [
+            {
+                "key": field.key,
+                "label": field.label,
+                "type": field.value_type,
+                "required": field.required,
+                "description": field.description,
+                "choices": field.choices,
+                "hints": field.extraction_hints,
+            }
+            for field in schema.fields.all()
+        ],
+    }
+
+
+def collect_case_evidence(case: Case) -> list[dict[str, Any]]:
+    rows = []
+    for item in case.evidence_items.order_by("created_at"):
+        rows.append(
+            {
+                "evidence_id": str(item.id),
+                "source_kind": item.source_kind,
+                "text": item.text,
+                "start_ms": item.start_ms,
+                "end_ms": item.end_ms,
+                "metadata": item.metadata,
+            }
+        )
+    return rows
+
+
+@transaction.atomic
+def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -> ExtractionRun:
+    run = ExtractionRun.objects.select_for_update().select_related("schema").get(pk=run.pk)
+    field_map = {field.key: field for field in run.schema.fields.all()}
+    evidence_map = {
+        str(item.id): item for item in Evidence.objects.filter(case=run.case)
+    }
+
+    ExtractedFact.objects.filter(extraction_run=run).delete()
+    CaseFieldIssue.objects.filter(case=run.case, status=CaseFieldIssue.Status.OPEN).delete()
+
+    seen_fields: set[str] = set()
+    for payload in response.get("facts", []):
+        key = payload.get("field")
+        field = field_map.get(key)
+        if field is None or "value" not in payload:
+            continue
+        seen_fields.add(key)
+        fact = ExtractedFact.objects.create(
+            case=run.case,
+            field=field,
+            extraction_run=run,
+            value=payload["value"],
+            normalized_value=payload.get("normalized_value"),
+            confidence=payload.get("confidence"),
+        )
+        for evidence_id in payload.get("evidence_ids", []):
+            evidence = evidence_map.get(str(evidence_id))
+            if evidence:
+                FactEvidence.objects.get_or_create(fact=fact, evidence=evidence)
+
+    for field in run.schema.fields.filter(required=True):
+        if field.key not in seen_fields:
+            CaseFieldIssue.objects.create(
+                case=run.case,
+                field=field,
+                issue_type=CaseFieldIssue.IssueType.MISSING,
+                details={"reason": "required_field_not_extracted"},
+            )
+
+    for conflict in response.get("conflicts", []):
+        field = field_map.get(conflict.get("field"))
+        if field:
+            CaseFieldIssue.objects.create(
+                case=run.case,
+                field=field,
+                issue_type=CaseFieldIssue.IssueType.CONFLICT,
+                details=conflict,
+            )
+            ExtractedFact.objects.filter(case=run.case, field=field).update(
+                status=ExtractedFact.Status.CONFLICTED
+            )
+
+    run.raw_response = response
+    run.status = ExtractionRun.Status.COMPLETED
+    run.completed_at = timezone.now()
+    run.error_message = ""
+    run.save(update_fields=["raw_response", "status", "completed_at", "error_message"])
+    return run
