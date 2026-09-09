@@ -50,6 +50,9 @@ class TaskFailure(models.Model):
 
 
 class IntegrationSettings(models.Model):
+    class PaymentProvider(models.TextChoices):
+        ZIBAL = "zibal", "زیبال"
+
     id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
 
     avalai_enabled = models.BooleanField(default=True)
@@ -69,6 +72,33 @@ class IntegrationSettings(models.Model):
     bale_bot_token_encrypted = models.TextField(blank=True, editable=False)
     bale_webhook_secret_encrypted = models.TextField(blank=True, editable=False)
     bale_webhook_rate_limit_per_minute = models.PositiveIntegerField(default=120)
+
+    creator_name = models.CharField(max_length=160, default="آراز شاه‌کرمی")
+    creator_url = models.URLField(default="https://araz.me")
+    support_email = models.EmailField(default="mail@araz.me")
+
+    show_billing_portal = models.BooleanField(
+        default=True,
+        help_text="نمایش بخش اشتراک، مصرف و پلن‌ها در پنل کاربران.",
+    )
+    online_payment_enabled = models.BooleanField(
+        default=False,
+        help_text="فقط پس از تکمیل اتصال و تأیید جریان پرداخت فعال شود.",
+    )
+    payment_provider = models.CharField(
+        max_length=32,
+        choices=PaymentProvider.choices,
+        default=PaymentProvider.ZIBAL,
+    )
+    zibal_merchant = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text="Merchant زیبال. تا پیش از راه‌اندازی پرداخت آنلاین می‌تواند خالی بماند.",
+    )
+    billing_notice = models.CharField(
+        max_length=500,
+        default="پرداخت آنلاین به‌زودی از طریق زیبال فعال خواهد شد.",
+    )
 
     last_avalai_test_at = models.DateTimeField(null=True, blank=True, editable=False)
     last_avalai_test_ok = models.BooleanField(null=True, editable=False)
@@ -91,7 +121,7 @@ class IntegrationSettings(models.Model):
         return None
 
     def __str__(self) -> str:
-        return "AvalAI & Bale integrations"
+        return "Nvise product & integration settings"
 
     @property
     def avalai_api_key(self) -> str:
