@@ -26,11 +26,11 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: n vise
-      POSTGRES_USER: n vise
-      POSTGRES_PASSWORD: n vise
+      POSTGRES_DB: nvise
+      POSTGRES_USER: nvise
+      POSTGRES_PASSWORD: nvise
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U n vise -d n vise"]
+      test: ["CMD-SHELL", "pg_isready -U nvise -d nvise"]
       interval: 5s
       timeout: 5s
       retries: 10
