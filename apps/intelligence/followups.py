@@ -1,5 +1,4 @@
 from asgiref.sync import async_to_sync
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -7,6 +6,7 @@ from apps.cases.models import Case
 from apps.evidence.services import sync_message_evidence
 from apps.messaging.models import CaseMessage, ConversationState
 from apps.messaging.providers.bale import BaleProvider
+from apps.system.integrations import get_bale_config
 
 from .models import CaseFieldIssue, FollowUpQuestion
 
@@ -58,9 +58,10 @@ def send_next_follow_up(case: Case) -> FollowUpQuestion | None:
         .order_by("-updated_at")
         .first()
     )
-    if state is None or not settings.BALE_BOT_TOKEN:
+    bale = get_bale_config()
+    if state is None or not bale.enabled or not bale.bot_token:
         return question
-    provider = BaleProvider(settings.BALE_BOT_TOKEN)
+    provider = BaleProvider(bale.bot_token)
     async_to_sync(provider.send_text)(
         state.external_chat_id,
         f"برای تکمیل پرونده «{case.title or case.case_code}»:\n\n{question.question_text}",
