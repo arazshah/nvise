@@ -105,6 +105,57 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
 
 
 @transaction.atomic
+def create_review_revision(
+    *,
+    case: Case,
+    user,
+    title: str,
+    summary: str,
+    section_contents: dict[str, str],
+) -> ReportRevision:
+    if case.status != Case.Status.READY_FOR_REVIEW:
+        raise ValueError("Only reports ready for review can be edited")
+    report = Report.objects.select_for_update().get(case=case)
+    current = ReportRevision.objects.prefetch_related("sections").get(pk=report.current_revision_id)
+    next_revision = current.revision_number + 1
+    revision = ReportRevision.objects.create(
+        report=report,
+        revision_number=next_revision,
+        title=title.strip() or current.title,
+        summary=summary.strip(),
+        structured_data=current.structured_data,
+        source_snapshot={
+            **current.source_snapshot,
+            "edited_from_revision": current.revision_number,
+            "editor_user_id": str(user.pk),
+        },
+        created_by=user,
+    )
+    for section in current.sections.order_by("sequence", "key"):
+        ReportSection.objects.create(
+            revision=revision,
+            key=section.key,
+            title=section.title,
+            sequence=section.sequence,
+            content=section_contents.get(section.key, section.content).strip(),
+            data=section.data,
+        )
+    report.current_revision = revision
+    report.save(update_fields=["current_revision", "updated_at"])
+    CaseEvent.objects.create(
+        case=case,
+        event_type="report.revision_edited",
+        actor=user,
+        payload={
+            "report_id": str(report.id),
+            "from_revision": current.revision_number,
+            "to_revision": revision.revision_number,
+        },
+    )
+    return revision
+
+
+@transaction.atomic
 def approve_report(*, case: Case, user, note: str = "") -> Report:
     report = Report.objects.select_for_update().get(case=case)
     if report.status != Report.Status.READY_FOR_REVIEW or report.current_revision_id is None:
@@ -119,4 +170,8 @@ def approve_report(*, case: Case, user, note: str = "") -> Report:
     report.status = Report.Status.APPROVED
     report.save(update_fields=["status", "updated_at"])
     approve_case(case=case, actor=user)
+
+    from apps.documents.services import ensure_docx_document
+
+    ensure_docx_document(revision=revision, requested_by=user)
     return report
