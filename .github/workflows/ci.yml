@@ -45,6 +45,11 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Django checks
         run: python manage.py check
+      - name: Generate migration preview
+        run: |
+          python manage.py makemigrations accounts tenants cases messaging --noinput
+          echo '--- GENERATED MIGRATIONS ---'
+          find apps -path '*/migrations/*.py' -type f -print -exec cat {} \;
       - name: Lint
         run: ruff check .
       - name: Tests
