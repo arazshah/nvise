@@ -16,7 +16,13 @@ class MessagingProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def send_document(self, chat_id: str, document: bytes, filename: str) -> dict:
+    async def send_document(
+        self,
+        chat_id: str,
+        document: bytes,
+        filename: str,
+        caption: str | None = None,
+    ) -> dict:
         raise NotImplementedError
 
     @abstractmethod
