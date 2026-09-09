@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from apps.accounts.models import BaleIdentity
 from apps.tenants.models import Tenant, TenantMembership
+from apps.tenants.services import add_tenant_member
 
 from .handlers import handle_message
 from .models import InboundUpdate
@@ -47,11 +48,7 @@ def _resolve_bale_user(message):
             slug=f"personal-{user.id}",
             defaults={"name": display_name or "حساب شخصی نویسه"},
         )
-        TenantMembership.objects.get_or_create(
-            tenant=tenant,
-            user=user,
-            defaults={"role": TenantMembership.Role.OWNER},
-        )
+        add_tenant_member(tenant=tenant, user=user, role=TenantMembership.Role.OWNER)
 
     return user
 
