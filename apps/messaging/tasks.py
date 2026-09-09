@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import BaleIdentity
+from apps.intelligence.actions import handle_analysis_action
 from apps.portal.services import create_portal_access_token
 from apps.subscriptions.services import QuotaExceededError
 from apps.system.integrations import get_bale_config
@@ -109,8 +110,15 @@ def process_bale_update(self, inbound_update_id: str) -> None:
         with transaction.atomic():
             user = _resolve_bale_user(normalized.message)
 
-        if (normalized.message.text or "").strip() == PORTAL_LOGIN_LABEL:
+        message_text = (normalized.message.text or "").strip()
+        if message_text == PORTAL_LOGIN_LABEL:
             _send_portal_access_link(provider=provider, user=user, message=normalized.message)
+        elif handle_analysis_action(
+            provider=provider,
+            user=user,
+            message=normalized.message,
+        ):
+            pass
         else:
             handle_message(
                 inbound=inbound,
