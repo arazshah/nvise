@@ -87,7 +87,8 @@ def start_extraction(*, case: Case, schema: FieldSchema) -> ExtractionRun:
     )
     case.vertical_key = schema.sub_vertical.vertical.key
     case.sub_vertical_key = schema.sub_vertical.key
-    case.save(update_fields=["vertical_key", "sub_vertical_key", "updated_at"])
+    case.analysis_status = Case.AnalysisStatus.QUEUED
+    case.save(update_fields=["vertical_key", "sub_vertical_key", "analysis_status", "updated_at"])
     from .tasks import extract_case_facts
 
     transaction.on_commit(lambda: extract_case_facts.delay(str(run.id)))
@@ -111,15 +112,64 @@ def supplemental_questions(case: Case) -> list[str]:
     return questions
 
 
+def _upsert_issue(
+    *,
+    case: Case,
+    field: FieldDefinition,
+    issue_type: str,
+    details: dict[str, Any],
+    generated_keys: set[tuple[str, str]],
+    terminal_field_ids: set[str],
+) -> CaseFieldIssue | None:
+    """Create/update an issue without resurrecting a field the user already resolved or waived."""
+
+    field_id = str(field.id)
+    if field_id in terminal_field_ids:
+        return None
+
+    key = (field_id, issue_type)
+    generated_keys.add(key)
+    issue = CaseFieldIssue.objects.filter(
+        case=case,
+        field=field,
+        issue_type=issue_type,
+        status=CaseFieldIssue.Status.OPEN,
+    ).first()
+    if issue is None:
+        return CaseFieldIssue.objects.create(
+            case=case,
+            field=field,
+            issue_type=issue_type,
+            details=details,
+        )
+    issue.details = details
+    issue.save(update_fields=["details"])
+    return issue
+
+
 @transaction.atomic
 def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -> ExtractionRun:
-    run = ExtractionRun.objects.select_for_update().select_related("schema").get(pk=run.pk)
+    run = ExtractionRun.objects.select_for_update().select_related("schema", "case").get(pk=run.pk)
     field_map = {field.key: field for field in run.schema.fields.all()}
     evidence_map = {str(item.id): item for item in Evidence.objects.filter(case=run.case)}
 
     ExtractedFact.objects.filter(extraction_run=run).delete()
-    CaseFieldIssue.objects.filter(case=run.case, status=CaseFieldIssue.Status.OPEN).delete()
 
+    terminal_field_ids = {
+        str(field_id)
+        for field_id in CaseFieldIssue.objects.filter(
+            case=run.case,
+            status__in=[
+                CaseFieldIssue.Status.RESOLVED,
+                CaseFieldIssue.Status.UNAVAILABLE,
+                CaseFieldIssue.Status.WAIVED,
+            ],
+        ).values_list("field_id", flat=True)
+    }
+    existing_open = list(
+        CaseFieldIssue.objects.filter(case=run.case, status=CaseFieldIssue.Status.OPEN)
+    )
+    generated_keys: set[tuple[str, str]] = set()
     seen_fields: set[str] = set()
     values_by_field: dict[str, set[str]] = defaultdict(set)
 
@@ -131,11 +181,13 @@ def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -
         seen_fields.add(key)
         value = payload["value"]
         if not _value_is_valid(field, value):
-            CaseFieldIssue.objects.create(
+            _upsert_issue(
                 case=run.case,
                 field=field,
                 issue_type=CaseFieldIssue.IssueType.INVALID,
                 details={"value": value, "expected_type": field.value_type},
+                generated_keys=generated_keys,
+                terminal_field_ids=terminal_field_ids,
             )
             continue
 
@@ -155,44 +207,47 @@ def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -
 
     for field in run.schema.fields.filter(required=True):
         if field.key not in seen_fields:
-            CaseFieldIssue.objects.create(
+            _upsert_issue(
                 case=run.case,
                 field=field,
                 issue_type=CaseFieldIssue.IssueType.MISSING,
                 details={"reason": "required_field_not_extracted"},
+                generated_keys=generated_keys,
+                terminal_field_ids=terminal_field_ids,
             )
 
-    conflict_keys = {
-        key for key, values in values_by_field.items() if len(values) > 1
-    }
+    conflict_keys = {key for key, values in values_by_field.items() if len(values) > 1}
+    conflict_details: dict[str, dict[str, Any]] = {}
     for conflict in response.get("conflicts", []):
         key = conflict.get("field")
         if key in field_map:
             conflict_keys.add(key)
-            CaseFieldIssue.objects.create(
-                case=run.case,
-                field=field_map[key],
-                issue_type=CaseFieldIssue.IssueType.CONFLICT,
-                details=conflict,
-            )
+            conflict_details[key] = conflict
 
     for key in conflict_keys:
         field = field_map[key]
-        if not CaseFieldIssue.objects.filter(
+        _upsert_issue(
             case=run.case,
             field=field,
             issue_type=CaseFieldIssue.IssueType.CONFLICT,
-            status=CaseFieldIssue.Status.OPEN,
-        ).exists():
-            CaseFieldIssue.objects.create(
-                case=run.case,
-                field=field,
-                issue_type=CaseFieldIssue.IssueType.CONFLICT,
-                details={"reason": "multiple_distinct_values_extracted"},
-            )
-        ExtractedFact.objects.filter(case=run.case, field=field).update(
+            details=conflict_details.get(key, {"reason": "multiple_distinct_values_extracted"}),
+            generated_keys=generated_keys,
+            terminal_field_ids=terminal_field_ids,
+        )
+        ExtractedFact.objects.filter(case=run.case, field=field, extraction_run=run).update(
             status=ExtractedFact.Status.CONFLICTED
         )
+
+    # Open issues that disappeared after re-analysis are resolved instead of being deleted.
+    now = timezone.now()
+    for issue in existing_open:
+        key = (str(issue.field_id), issue.issue_type)
+        if key not in generated_keys:
+            issue.status = CaseFieldIssue.Status.RESOLVED
+            issue.resolved_at = now
+            if not issue.resolution_note:
+                issue.resolution_note = "در تحلیل مجدد، این ابهام دیگر مشاهده نشد."
+            issue.save(update_fields=["status", "resolved_at", "resolution_note"])
 
     run.raw_response = response
     run.status = ExtractionRun.Status.COMPLETED
