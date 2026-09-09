@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.subscriptions.models import Plan, Subscription, UsageRecord
+from apps.system.jalali import format_jalali
 from apps.system.models import IntegrationSettings
 from apps.tenants.models import Tenant, TenantMembership
 
@@ -33,15 +34,17 @@ def test_public_home_and_guide_reflect_current_product_identity(client):
     guide = client.get("/guide/")
     assert guide.status_code == 200
     guide_text = guide.content.decode("utf-8")
-    assert "راهنمای کامل استفاده از نویسه" in guide_text
+    assert "راهنمای ساده استفاده از نویسه" in guide_text
     assert "🏠 منوی اصلی" in guide_text
-    assert "کیف پول بله" in guide_text
-    assert "sendInvoice" in guide_text
+    assert "💳 اشتراک و مصرف" in guide_text
+    assert "sendInvoice" not in guide_text
+    assert "pre_checkout_query" not in guide_text
+    assert "Admin" not in guide_text
     assert "زیبال" not in guide_text
 
 
 @pytest.mark.django_db
-def test_billing_portal_shows_admin_plan_subscription_and_usage(client):
+def test_billing_portal_shows_plan_subscription_usage_and_jalali_dates(client):
     user = User.objects.create_user(username="billing-user")
     tenant = Tenant.objects.create(name="حساب شخصی", slug="billing-personal")
     TenantMembership.objects.create(tenant=tenant, user=user, role=TenantMembership.Role.OWNER)
@@ -56,12 +59,13 @@ def test_billing_portal_shows_admin_plan_subscription_and_usage(client):
         max_members=3,
     )
     now = timezone.now()
+    period_end = now + timedelta(days=29)
     Subscription.objects.create(
         tenant=tenant,
         plan=plan,
         status=Subscription.Status.ACTIVE,
         current_period_start=now - timedelta(days=1),
-        current_period_end=now + timedelta(days=29),
+        current_period_end=period_end,
     )
     UsageRecord.objects.create(
         tenant=tenant,
@@ -87,7 +91,8 @@ def test_billing_portal_shows_admin_plan_subscription_and_usage(client):
     assert response.status_code == 200
     text = response.content.decode("utf-8")
     assert "حرفه‌ای" in text
-    assert "کیف پول بله" in text
-    assert "پرداخت اشتراک از طریق کیف پول بله" in text
+    assert "پرداخت از طریق بله" in text
+    assert "پرداخت آنلاین فعلاً در دسترس نیست" in text
+    assert format_jalali(timezone.localtime(period_end)) in text
     assert "2" in text
     assert settings_obj.bale_payment_token == "WALLET-TEST-1111111111111111"
