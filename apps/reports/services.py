@@ -12,6 +12,7 @@ SECTION_DEFINITIONS = [
     ("incident", "شرح حادثه"),
     ("damage", "ارزیابی خسارت"),
     ("supporting_information", "اطلاعات تکمیلی"),
+    ("limitations", "محدودیت‌ها و موارد نامشخص"),
 ]
 
 
@@ -57,6 +58,67 @@ def _latest_fact_map(case: Case) -> dict:
     return result
 
 
+def _issue_type_label(issue_type: str) -> str:
+    return {
+        CaseFieldIssue.IssueType.MISSING: "اطلاعات یافت نشد",
+        CaseFieldIssue.IssueType.CONFLICT: "اطلاعات متناقض",
+        CaseFieldIssue.IssueType.INVALID: "مقدار نامعتبر یا نامطمئن",
+    }.get(issue_type, "مورد نیازمند بررسی")
+
+
+def _issue_resolution_label(status: str) -> str:
+    return {
+        CaseFieldIssue.Status.UNAVAILABLE: "اطلاعات در دسترس نبود",
+        CaseFieldIssue.Status.WAIVED: "با تصمیم کاربر، گزارش با اطلاعات فعلی ادامه یافت",
+        CaseFieldIssue.Status.RESOLVED: "رفع شده",
+    }.get(status, status)
+
+
+def _report_limitations(case: Case) -> list[dict]:
+    issues = (
+        CaseFieldIssue.objects.filter(
+            case=case,
+            status__in=[CaseFieldIssue.Status.UNAVAILABLE, CaseFieldIssue.Status.WAIVED],
+        )
+        .select_related("field")
+        .order_by("field__sequence", "created_at")
+    )
+    limitations = []
+    for issue in issues:
+        details = issue.details or {}
+        limitations.append(
+            {
+                "field_key": issue.field.key,
+                "field_label": issue.field.label,
+                "issue_type": issue.issue_type,
+                "issue_type_label": _issue_type_label(issue.issue_type),
+                "resolution_status": issue.status,
+                "resolution_label": _issue_resolution_label(issue.status),
+                "resolution_note": issue.resolution_note or "",
+                "details": details,
+            }
+        )
+    return limitations
+
+
+def _limitation_section_data(limitations: list[dict]) -> dict:
+    data = {}
+    for index, item in enumerate(limitations, start=1):
+        note = item["resolution_note"].strip()
+        value_parts = [item["issue_type_label"], item["resolution_label"]]
+        if note:
+            value_parts.append(note)
+        data[f"limitation_{index}"] = {
+            "label": item["field_label"],
+            "value": " — ".join(value_parts),
+            "field_key": item["field_key"],
+            "issue_type": item["issue_type"],
+            "resolution_status": item["resolution_status"],
+            "details": item["details"],
+        }
+    return data
+
+
 @transaction.atomic
 def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
     locked_case = Case.objects.select_for_update().get(pk=case.pk)
@@ -78,36 +140,78 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
     locked_case.save(update_fields=["status", "report_status", "updated_at"])
 
     facts = _latest_fact_map(locked_case)
+    limitations = _report_limitations(locked_case)
     report, _ = Report.objects.select_for_update().get_or_create(case=locked_case)
-    next_revision = (report.revisions.order_by("-revision_number").values_list("revision_number", flat=True).first() or 0) + 1
+    next_revision = (
+        report.revisions.order_by("-revision_number").values_list("revision_number", flat=True).first()
+        or 0
+    ) + 1
+    summary = "گزارش ساختاری بر پایه اطلاعات ثبت‌شده و شواهد قابل ردیابی پرونده."
+    if limitations:
+        summary += (
+            f" این گزارش با {len(limitations)} مورد اطلاعات نامشخص یا در دسترس‌نبوده "
+            "تهیه شده است؛ جزئیات این موارد در بخش «محدودیت‌ها و موارد نامشخص» ثبت شده است."
+        )
+
     revision = ReportRevision.objects.create(
         report=report,
         revision_number=next_revision,
         title=f"گزارش کارشناسی خسارت - {locked_case.title or locked_case.case_code}",
-        summary="گزارش ساختاری بر پایه اطلاعات ثبت‌شده و شواهد قابل ردیابی پرونده.",
-        structured_data={"case_code": locked_case.case_code, "facts": facts},
+        summary=summary,
+        structured_data={
+            "case_code": locked_case.case_code,
+            "facts": facts,
+            "limitations": limitations,
+            "has_limitations": bool(limitations),
+        },
         source_snapshot={
             "case_status": locked_case.status,
             "vertical": locked_case.vertical_key,
             "sub_vertical": locked_case.sub_vertical_key,
             "open_issues": 0,
+            "unavailable_issues": sum(
+                1
+                for item in limitations
+                if item["resolution_status"] == CaseFieldIssue.Status.UNAVAILABLE
+            ),
+            "waived_issues": sum(
+                1
+                for item in limitations
+                if item["resolution_status"] == CaseFieldIssue.Status.WAIVED
+            ),
+            "limitation_count": len(limitations),
         },
         created_by=created_by,
     )
+
     grouped = {key: {} for key, _ in SECTION_DEFINITIONS}
     for field_key, payload in facts.items():
         grouped[_field_section(field_key)][field_key] = payload
+    grouped["limitations"] = _limitation_section_data(limitations)
+
     for sequence, (key, title) in enumerate(SECTION_DEFINITIONS):
         section_data = grouped[key]
-        lines = [f"{item['label']}: {item['value']}" for item in section_data.values()]
+        if key == "limitations":
+            if limitations:
+                content = (
+                    "این گزارش با وجود موارد زیر و بر اساس تصمیم کاربر برای ادامه با اطلاعات موجود "
+                    "تهیه شده است. این موارد باید هنگام تفسیر نتیجه گزارش در نظر گرفته شوند."
+                )
+            else:
+                content = "در زمان تهیه این نسخه، مورد نامشخص یا کنارگذاشته‌شده‌ای ثبت نشده است."
+        else:
+            content = "\n".join(
+                f"{item['label']}: {item['value']}" for item in section_data.values()
+            )
         ReportSection.objects.create(
             revision=revision,
             key=key,
             title=title,
             sequence=sequence,
-            content="\n".join(lines),
+            content=content,
             data=section_data,
         )
+
     report.current_revision = revision
     report.status = Report.Status.READY_FOR_REVIEW
     report.save(update_fields=["current_revision", "status", "updated_at"])
@@ -115,7 +219,11 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
         case=locked_case,
         event_type="report.revision_created",
         actor=created_by,
-        payload={"report_id": str(report.id), "revision": revision.revision_number},
+        payload={
+            "report_id": str(report.id),
+            "revision": revision.revision_number,
+            "limitation_count": len(limitations),
+        },
     )
     record_audit_event(
         event_type="report.revision_created",
@@ -123,7 +231,11 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
         case=locked_case,
         object_type="report_revision",
         object_id=revision.id,
-        metadata={"report_id": str(report.id), "revision": revision.revision_number},
+        metadata={
+            "report_id": str(report.id),
+            "revision": revision.revision_number,
+            "limitation_count": len(limitations),
+        },
     )
     return revision
 
