@@ -10,8 +10,8 @@ from django.utils import timezone
 from apps.accounts.models import BaleIdentity
 from apps.intelligence.actions import handle_analysis_action
 from apps.portal.services import create_portal_access_token
-from apps.subscriptions.models import UsageRecord
-from apps.subscriptions.payments import PaymentError, process_successful_payment
+from apps.subscriptions.models import Plan, UsageRecord
+from apps.subscriptions.payments import PaymentError, create_and_send_invoice, process_successful_payment
 from apps.subscriptions.services import (
     QuotaExceededError,
     SubscriptionAccessError,
@@ -36,6 +36,9 @@ SUBSCRIPTION_STATUS_LABELS = {
     "cancelled": "لغو شده",
     "expired": "منقضی شده",
 }
+
+PLAN_ACTION_PREFIX = "💳 انتخاب پلن:"
+BACK_TO_BILLING_LABEL = "↩️ بازگشت به اشتراک و مصرف"
 
 
 def _resolve_bale_user(message):
@@ -112,8 +115,8 @@ def _finish_subscription_block(inbound, provider, message, exc: SubscriptionAcce
             "⏳ دوره آزمایشی شما به پایان رسیده است.\n\n"
             "پرونده‌ها، مدارک و گزارش‌های قبلی شما کاملاً حفظ شده‌اند؛ فقط عملیات هزینه‌دار مثل "
             "تبدیل صوت و تحلیل هوشمند تا فعال‌کردن یک پلن متوقف می‌شوند.\n\n"
-            "💳 برای مشاهده وضعیت حساب روی «اشتراک و مصرف» بزنید.\n"
-            "🌐 برای انتخاب پلن و پرداخت، وارد پنل نویسه شوید."
+            "💳 برای مشاهده و خرید پلن روی «اشتراک و مصرف» بزنید.\n"
+            "🌐 در صورت تمایل می‌توانید اشتراک را از پنل نویسه هم مدیریت کنید."
         )
     else:
         text = (
@@ -142,13 +145,37 @@ def _send_portal_access_link(*, provider, user, message) -> None:
     )
 
 
-def _show_billing_summary(*, provider, user, message) -> None:
-    membership = (
+def _billing_membership(user):
+    return (
         user.tenant_memberships.select_related("tenant", "tenant__subscription__plan")
         .filter(is_active=True, tenant__is_active=True)
         .order_by("created_at")
         .first()
     )
+
+
+def _plan_button_label(plan: Plan, current_plan_id=None) -> str:
+    action = "تمدید" if current_plan_id == plan.id else "خرید"
+    return f"{PLAN_ACTION_PREFIX}{plan.code} · {action} {plan.name}"
+
+
+def _billing_keyboard(subscription) -> dict:
+    rows = []
+    current_plan_id = subscription.plan_id if subscription else None
+    plans = Plan.objects.filter(is_active=True, monthly_price__gt=0).order_by("monthly_price", "name")
+    for plan in plans:
+        rows.append([{"text": _plan_button_label(plan, current_plan_id)}])
+    rows.extend(
+        [
+            [{"text": PORTAL_LOGIN_LABEL}],
+            [{"text": "🏠 منوی اصلی"}],
+        ]
+    )
+    return {"keyboard": rows, "resize_keyboard": True}
+
+
+def _show_billing_summary(*, provider, user, message) -> None:
+    membership = _billing_membership(user)
     if membership is None:
         async_to_sync(provider.send_text)(
             message.external_chat_id,
@@ -186,6 +213,19 @@ def _show_billing_summary(*, provider, user, message) -> None:
     )
     period_end = format_jalali(timezone.localtime(subscription.current_period_end))
 
+    purchasable = list(Plan.objects.filter(is_active=True, monthly_price__gt=0).order_by("monthly_price", "name"))
+    plans_text = ""
+    if purchasable:
+        lines = ["\n📦 پلن‌های قابل خرید یا تمدید"]
+        for item in purchasable:
+            lines.append(
+                f"• {item.name}: {item.monthly_price:,.0f} ریال / ماه — "
+                f"{item.max_cases_per_period} پرونده، "
+                f"{item.max_stt_seconds_per_period} ثانیه صوت، "
+                f"{item.max_ai_extractions_per_period} تحلیل"
+            )
+        plans_text = "\n".join(lines)
+
     text = (
         "💳 اشتراک و مصرف\n"
         "━━━━━━━━━━━━━━\n"
@@ -199,11 +239,35 @@ def _show_billing_summary(*, provider, user, message) -> None:
         f"🎙 تبدیل صوت: {stt} از {plan.max_stt_seconds_per_period} ثانیه\n"
         f"🧠 تحلیل هوشمند: {ai} از {plan.max_ai_extractions_per_period}\n"
         f"📄 سند تولیدشده: {docs}"
-        f"{expired_note}\n\n"
-        "برای خرید، تمدید یا تغییر پلن از «🌐 ورود به پنل نویسه» استفاده کنید؛ "
-        "صورتحساب نهایی داخل همین گفتگوی بله برای شما ارسال می‌شود."
+        f"{expired_note}\n"
+        f"{plans_text}\n\n"
+        "یکی از پلن‌های پایین را برای خرید یا تمدید انتخاب کنید. صورتحساب همان‌جا در بله نمایش داده می‌شود.\n"
+        "🌐 یا برای مدیریت کامل اشتراک وارد پنل نویسه شوید."
     )
-    async_to_sync(provider.send_text)(message.external_chat_id, text, main_menu_keyboard())
+    async_to_sync(provider.send_text)(message.external_chat_id, text, _billing_keyboard(subscription))
+
+
+def _handle_bale_plan_purchase(*, provider, user, message, message_text: str) -> None:
+    membership = _billing_membership(user)
+    if membership is None:
+        raise PaymentError("حساب فعالی برای خرید اشتراک پیدا نشد.")
+
+    remainder = message_text[len(PLAN_ACTION_PREFIX):].strip()
+    plan_code = remainder.split("·", 1)[0].strip()
+    if not plan_code:
+        raise PaymentError("پلن انتخاب‌شده معتبر نیست.")
+
+    plan = Plan.objects.filter(code=plan_code, is_active=True, monthly_price__gt=0).first()
+    if plan is None:
+        raise PaymentError("این پلن در حال حاضر قابل خرید نیست.")
+
+    create_and_send_invoice(user=user, tenant=membership.tenant, plan=plan)
+    async_to_sync(provider.send_text)(
+        message.external_chat_id,
+        f"🧾 صورتحساب پلن «{plan.name}» برای شما ارسال شد.\n\n"
+        "پرداخت را داخل بله تکمیل کنید. پس از تأیید موفق، اشتراک شما به‌صورت خودکار فعال یا تمدید می‌شود.",
+        {"keyboard": [[{"text": BACK_TO_BILLING_LABEL}], [{"text": "🏠 منوی اصلی"}]], "resize_keyboard": True},
+    )
 
 
 def _handle_successful_payment(*, inbound, provider, message) -> None:
@@ -255,8 +319,15 @@ def process_bale_update(self, inbound_update_id: str) -> None:
         message_text = (normalized.message.text or "").strip()
         if message_text == PORTAL_LOGIN_LABEL:
             _send_portal_access_link(provider=provider, user=user, message=normalized.message)
-        elif message_text == BILLING_LABEL:
+        elif message_text in {BILLING_LABEL, BACK_TO_BILLING_LABEL}:
             _show_billing_summary(provider=provider, user=user, message=normalized.message)
+        elif message_text.startswith(PLAN_ACTION_PREFIX):
+            _handle_bale_plan_purchase(
+                provider=provider,
+                user=user,
+                message=normalized.message,
+                message_text=message_text,
+            )
         elif handle_analysis_action(
             provider=provider,
             user=user,
@@ -286,8 +357,7 @@ def process_bale_update(self, inbound_update_id: str) -> None:
         inbound.save(update_fields=["processed_at", "processing_error"])
         async_to_sync(provider.send_text)(
             normalized.message.external_chat_id,
-            "⚠️ پرداخت دریافت شد اما برای اعمال روی اشتراک نیاز به بررسی دارد. "
-            "لطفاً با پشتیبانی نویسه تماس بگیرید.",
+            f"⚠️ {exc}",
             main_menu_keyboard(),
         )
         return
