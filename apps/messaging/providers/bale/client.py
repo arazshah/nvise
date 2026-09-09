@@ -7,10 +7,15 @@ class BaleAPIError(RuntimeError):
     pass
 
 
+class BaleFileTooLargeError(BaleAPIError):
+    pass
+
+
 class BaleClient:
     def __init__(self, token: str, timeout: float = 20.0) -> None:
         self.token = token
         self.base_url = f"https://tapi.bale.ai/bot{token}"
+        self.file_base_url = f"https://tapi.bale.ai/file/bot{token}"
         self.timeout = timeout
 
     async def call(self, method: str, payload: dict[str, Any] | None = None) -> Any:
@@ -45,3 +50,27 @@ class BaleClient:
     async def get_file(self, file_id: str) -> dict[str, Any]:
         result = await self.call("getFile", {"file_id": file_id})
         return result or {}
+
+    async def download_file(self, file_path: str, max_bytes: int) -> bytes:
+        url = f"{self.file_base_url}/{file_path.lstrip('/')}"
+        chunks: list[bytes] = []
+        total = 0
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with client.stream("GET", url) as response:
+                response.raise_for_status()
+                content_length = response.headers.get("content-length")
+                if content_length and int(content_length) > max_bytes:
+                    raise BaleFileTooLargeError(
+                        f"Bale file exceeds maximum allowed size ({content_length} > {max_bytes})"
+                    )
+
+                async for chunk in response.aiter_bytes():
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise BaleFileTooLargeError(
+                            f"Bale file exceeds maximum allowed size ({total} > {max_bytes})"
+                        )
+                    chunks.append(chunk)
+
+        return b"".join(chunks)
