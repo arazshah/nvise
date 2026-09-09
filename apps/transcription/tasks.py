@@ -1,3 +1,5 @@
+from math import ceil
+
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
@@ -5,6 +7,8 @@ from django.utils import timezone
 from apps.evidence.services import sync_transcript_evidence
 from apps.processing.models import ProcessingAttempt, ProcessingJob
 from apps.processing.storage import read_private_bytes
+from apps.subscriptions.models import UsageRecord
+from apps.subscriptions.services import assert_quota, record_usage
 
 from .models import Recording, Transcript, TranscriptSegment
 from .providers import get_stt_provider
@@ -15,7 +19,7 @@ def transcribe_audio(self, job_id: str) -> None:
     with transaction.atomic():
         job = (
             ProcessingJob.objects.select_for_update()
-            .select_related("attachment__message")
+            .select_related("attachment__message__case__tenant")
             .get(pk=job_id)
         )
         if job.status == ProcessingJob.Status.SUCCEEDED:
@@ -26,6 +30,10 @@ def transcribe_audio(self, job_id: str) -> None:
         attachment = job.attachment
         if not attachment.storage_key:
             raise RuntimeError("Attachment has not been stored yet")
+        case = attachment.message.case
+        if case is None:
+            raise RuntimeError("Transcription requires an assigned case")
+        assert_quota(case.tenant, UsageRecord.Metric.STT_SECONDS, 1)
 
         job.status = ProcessingJob.Status.RUNNING
         job.started_at = timezone.now()
@@ -86,15 +94,26 @@ def transcribe_audio(self, job_id: str) -> None:
                 ]
             )
 
+            duration_ms = max((segment.end_ms for segment in result.segments), default=0)
             recording.status = Recording.Status.TRANSCRIBED
-            if result.segments:
-                recording.duration_ms = max(segment.end_ms for segment in result.segments)
+            if duration_ms:
+                recording.duration_ms = duration_ms
             recording.save(update_fields=["status", "duration_ms", "updated_at"])
 
             job.status = ProcessingJob.Status.SUCCEEDED
             job.finished_at = timezone.now()
             job.last_error = ""
             job.save(update_fields=["status", "finished_at", "last_error", "updated_at"])
+
+            billed_seconds = max(1, ceil(duration_ms / 1000)) if duration_ms else 1
+            record_usage(
+                tenant=case.tenant,
+                metric=UsageRecord.Metric.STT_SECONDS,
+                quantity=billed_seconds,
+                idempotency_key=f"stt:{job.id}",
+                case=case,
+                metadata={"provider": provider.key, "model": result.model_name},
+            )
 
             attempt = ProcessingAttempt.objects.select_for_update().get(pk=attempt.pk)
             attempt.succeeded = True
@@ -105,6 +124,7 @@ def transcribe_audio(self, job_id: str) -> None:
                 "language": result.language,
                 "segments": len(result.segments),
                 "characters": len(result.text),
+                "billed_seconds": billed_seconds,
             }
             attempt.save(update_fields=["succeeded", "finished_at", "metadata"])
             transaction.on_commit(lambda: sync_transcript_evidence(transcript))
