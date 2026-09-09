@@ -2,6 +2,7 @@ from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
+from apps.evidence.services import sync_transcript_evidence
 from apps.processing.models import ProcessingAttempt, ProcessingJob
 from apps.processing.storage import read_private_bytes
 
@@ -56,10 +57,7 @@ def transcribe_audio(self, job_id: str) -> None:
 
             transcript, _ = Transcript.objects.select_for_update().get_or_create(
                 processing_job=job,
-                defaults={
-                    "recording": recording,
-                    "provider": provider.key,
-                },
+                defaults={"recording": recording, "provider": provider.key},
             )
             transcript.provider = provider.key
             transcript.model_name = result.model_name
@@ -109,6 +107,7 @@ def transcribe_audio(self, job_id: str) -> None:
                 "characters": len(result.text),
             }
             attempt.save(update_fields=["succeeded", "finished_at", "metadata"])
+            transaction.on_commit(lambda: sync_transcript_evidence(transcript))
 
     except Exception as exc:
         with transaction.atomic():
@@ -117,10 +116,7 @@ def transcribe_audio(self, job_id: str) -> None:
 
             transcript, _ = Transcript.objects.select_for_update().get_or_create(
                 processing_job=job,
-                defaults={
-                    "recording": recording,
-                    "provider": "unknown",
-                },
+                defaults={"recording": recording, "provider": "unknown"},
             )
             transcript.status = Transcript.Status.FAILED
             transcript.completed_at = timezone.now()
