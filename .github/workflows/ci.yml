@@ -45,6 +45,15 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Django checks
         run: python manage.py check
+      - name: Production deploy checks
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DJANGO_SECRET_KEY: ci-only-production-secret-key-with-more-than-fifty-characters-1234567890
+          DJANGO_ALLOWED_HOSTS: nvise.example.com
+          BALE_WEBHOOK_SECRET: ci-only-long-random-webhook-secret
+          BALE_BOT_TOKEN: ci-token
+          WEB_BASE_URL: https://nvise.example.com
+        run: python manage.py check --deploy --fail-level WARNING
       - name: Migration check
         run: python manage.py makemigrations --check --dry-run
       - name: Apply migrations
