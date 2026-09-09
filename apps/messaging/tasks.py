@@ -1,3 +1,4 @@
+from asgiref.sync import async_to_sync
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -5,8 +6,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import BaleIdentity
+from apps.subscriptions.services import QuotaExceededError
 from apps.tenants.models import Tenant, TenantMembership
-from apps.tenants.services import add_tenant_member
+from apps.tenants.services import MemberLimitExceededError, add_tenant_member
 
 from .handlers import handle_message
 from .models import InboundUpdate
@@ -53,6 +55,18 @@ def _resolve_bale_user(message):
     return user
 
 
+def _finish_non_retryable(inbound, provider, message, exc: Exception) -> None:
+    inbound.processed_at = timezone.now()
+    inbound.processing_error = str(exc)[:2000]
+    inbound.save(update_fields=["processed_at", "processing_error"])
+    if getattr(provider, "client", None) is not None:
+        async_to_sync(provider.send_text)(
+            message.external_chat_id,
+            "سهمیه حساب شما برای این عملیات به پایان رسیده است. "
+            "برای ادامه، Plan یا محدودیت‌های حساب را بررسی کنید.",
+        )
+
+
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
 def process_bale_update(self, inbound_update_id: str) -> None:
     inbound = InboundUpdate.objects.get(pk=inbound_update_id)
@@ -79,6 +93,9 @@ def process_bale_update(self, inbound_update_id: str) -> None:
         inbound.processed_at = timezone.now()
         inbound.processing_error = ""
         inbound.save(update_fields=["processed_at", "processing_error"])
+    except (QuotaExceededError, MemberLimitExceededError) as exc:
+        _finish_non_retryable(inbound, provider, normalized.message, exc)
+        return
     except Exception as exc:
         inbound.processing_error = str(exc)[:2000]
         inbound.save(update_fields=["processing_error"])
