@@ -24,6 +24,13 @@ ANALYSIS_ACTION_LABELS = {
 }
 
 
+def _active_case_keyboard(case):
+    # Local import avoids an import cycle: messaging.handlers imports intelligence services.
+    from apps.messaging.handlers import active_case_keyboard
+
+    return active_case_keyboard(case)
+
+
 def handle_analysis_action(*, provider, user, message) -> bool:
     text = (message.text or "").strip()
     if text not in ANALYSIS_ACTION_LABELS:
@@ -64,7 +71,9 @@ def handle_analysis_action(*, provider, user, message) -> bool:
             message.external_chat_id,
             "📎 اطلاعات یا مدرک بیشتری اضافه کنید.\n\n"
             "می‌توانید متن، صوت، تصویر یا فایل بفرستید. همه موارد داخل همین پرونده ذخیره می‌شوند.\n"
-            "پس از افزودن اطلاعات جدید، دوباره دکمه «🧠 تحلیل پرونده» را بزنید.",
+            "پس از افزودن اطلاعات جدید، دوباره دکمه «🧠 تحلیل پرونده» را بزنید.\n\n"
+            "اگر کارتان با این پرونده تمام شده، از «🏠 منوی اصلی» یا «📂 پرونده‌های من» استفاده کنید.",
+            _active_case_keyboard(case),
         )
         return True
 
@@ -102,7 +111,9 @@ def handle_analysis_action(*, provider, user, message) -> bool:
         async_to_sync(provider.send_text)(
             message.external_chat_id,
             "📄 گزارش بر اساس اطلاعات فعلی پرونده تولید شد.\n\n"
-            "لینک امن بررسی گزارش برای شما ارسال می‌شود.",
+            "لینک امن بررسی گزارش برای شما ارسال می‌شود.\n\n"
+            "✅ کار این پرونده تمام شده؟ می‌توانید همین حالا پرونده جدید بسازید، پرونده دیگری را انتخاب کنید یا به منوی اصلی برگردید.",
+            _active_case_keyboard(case),
         )
         transaction.on_commit(lambda: send_review_link.delay(str(case.id)))
         return True
