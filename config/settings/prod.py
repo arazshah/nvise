@@ -4,8 +4,6 @@ DEBUG = False
 
 if SECRET_KEY == "unsafe-dev-key":  # noqa: F405
     raise RuntimeError("DJANGO_SECRET_KEY must be configured in production")
-if not BALE_WEBHOOK_SECRET:  # noqa: F405
-    raise RuntimeError("BALE_WEBHOOK_SECRET must be configured in production")
 
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
