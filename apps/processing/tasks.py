@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.messaging.models import CaseMessage
 from apps.messaging.providers.bale import BaleProvider
 from apps.messaging.providers.bale.client import BaleFileTooLargeError
+from apps.system.integrations import get_bale_config
 
 from .models import CaseAttachment, ProcessingAttempt, ProcessingJob
 from .storage import store_private_bytes
@@ -55,10 +56,11 @@ def fetch_attachment(self, job_id: str) -> None:
     try:
         if attachment.provider != "bale":
             raise RuntimeError(f"Unsupported attachment provider: {attachment.provider}")
-        if not settings.BALE_BOT_TOKEN:
-            raise RuntimeError("BALE_BOT_TOKEN is required to fetch Bale attachments")
+        bale = get_bale_config()
+        if not bale.enabled or not bale.bot_token:
+            raise RuntimeError("Bale Bot Token is required to fetch Bale attachments")
 
-        provider = BaleProvider(settings.BALE_BOT_TOKEN)
+        provider = BaleProvider(bale.bot_token)
         file_info = async_to_sync(provider.get_file)(attachment.external_file_id)
         file_path = file_info.get("file_path") or ""
         if not file_path:
