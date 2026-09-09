@@ -56,10 +56,12 @@ def extract_case_facts(self, run_id: str) -> None:
             run.error_message = str(exc)[:2000]
             run.completed_at = timezone.now()
             run.save(update_fields=["status", "error_message", "completed_at"])
+            Case.objects.filter(pk=run.case_id).update(analysis_status=Case.AnalysisStatus.FAILED)
             return
         run.status = ExtractionRun.Status.RUNNING
         run.error_message = ""
         run.save(update_fields=["status", "error_message"])
+        Case.objects.filter(pk=run.case_id).update(analysis_status=Case.AnalysisStatus.PROCESSING)
 
     try:
         schema = FieldSchema.objects.prefetch_related("fields").select_related(
@@ -93,8 +95,14 @@ def extract_case_facts(self, run_id: str) -> None:
             case=run.case,
             status=CaseFieldIssue.Status.OPEN,
         ).exists()
-        target = Case.Status.NEEDS_INFORMATION if has_open_issues else Case.Status.READY_FOR_REVIEW
         refreshed_case = Case.objects.get(pk=run.case_id)
+        refreshed_case.analysis_status = (
+            Case.AnalysisStatus.NEEDS_REVIEW if has_open_issues else Case.AnalysisStatus.COMPLETED
+        )
+        refreshed_case.save(update_fields=["analysis_status", "updated_at"])
+
+        # Legacy mirror remains during the staged UI rollout so existing bot/report flows keep working.
+        target = Case.Status.NEEDS_INFORMATION if has_open_issues else Case.Status.READY_FOR_REVIEW
         if refreshed_case.status == Case.Status.FINALIZING:
             refreshed_case = transition_case(case=refreshed_case, target_status=target)
 
@@ -113,4 +121,5 @@ def extract_case_facts(self, run_id: str) -> None:
             run.error_message = str(exc)[:2000]
             run.completed_at = timezone.now()
             run.save(update_fields=["status", "error_message", "completed_at"])
+            Case.objects.filter(pk=run.case_id).update(analysis_status=Case.AnalysisStatus.FAILED)
         raise
