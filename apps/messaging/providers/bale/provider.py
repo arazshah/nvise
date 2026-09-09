@@ -8,6 +8,7 @@ from .client import BaleClient
 
 
 PORTAL_LOGIN_LABEL = "🌐 ورود به پنل نویسه"
+BILLING_LABEL = "💳 اشتراک و مصرف"
 
 
 class BaleProvider(MessagingProvider):
@@ -99,12 +100,15 @@ class BaleProvider(MessagingProvider):
         if not keyboard or keyboard.get("one_time_keyboard"):
             return keyboard
         rows = deepcopy(keyboard.get("keyboard") or [])
-        if not any(
-            button.get("text") == PORTAL_LOGIN_LABEL
+        existing = {
+            button.get("text")
             for row in rows
             for button in row
             if isinstance(button, dict)
-        ):
+        }
+        if BILLING_LABEL not in existing:
+            rows.append([{"text": BILLING_LABEL}])
+        if PORTAL_LOGIN_LABEL not in existing:
             rows.append([{"text": PORTAL_LOGIN_LABEL}])
         result = deepcopy(keyboard)
         result["keyboard"] = rows
