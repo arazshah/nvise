@@ -1,0 +1,29 @@
+[project]
+name = "nvise"
+version = "0.1.0"
+description = "Bot-first, case-centric professional reporting SaaS"
+requires-python = ">=3.12"
+dependencies = [
+  "Django>=5.1,<5.2",
+  "djangorestframework>=3.15,<3.16",
+  "psycopg[binary]>=3.2,<3.3",
+  "celery>=5.4,<5.5",
+  "redis>=5.0,<6",
+  "django-environ>=0.11,<0.12",
+  "gunicorn>=23,<24",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-django>=4.9,<5",
+  "ruff>=0.6,<0.7",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py", "*_test.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
