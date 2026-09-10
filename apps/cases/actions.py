@@ -120,6 +120,8 @@ def sync_system_actions(case: Case) -> list[CaseAction]:
             row.status = CaseAction.Status.DONE
             row.completed_at = now
             row.save(update_fields=["status", "completed_at", "updated_at"])
+            from .reminders import cancel_action_reminders
+            cancel_action_reminders(row)
 
     for key in wanted:
         config = _SYSTEM_ACTIONS[key]
@@ -168,6 +170,9 @@ def sync_system_actions(case: Case) -> list[CaseAction]:
                         "updated_at",
                     ]
                 )
+        if row.action_type == CaseAction.ActionType.REVIEW_REPORT:
+            from .reminders import schedule_report_review_reminder
+            schedule_report_review_reminder(row)
         active_rows.append(row)
     return active_rows
 
@@ -217,6 +222,9 @@ def create_manual_action(*, case: Case, user, title: str, description: str = "",
         actor=user,
         payload={"action_id": str(action.id), "manual": True},
     )
+    if due_at is not None:
+        from .reminders import ensure_action_reminder
+        ensure_action_reminder(action, user=user)
     return action
 
 
@@ -234,4 +242,6 @@ def complete_case_action(*, case: Case, action_id, user) -> CaseAction:
         actor=user,
         payload={"action_id": str(action.id)},
     )
+    from .reminders import cancel_action_reminders
+    cancel_action_reminders(action)
     return action
