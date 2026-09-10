@@ -69,6 +69,83 @@ class ReportSection(models.Model):
         ]
 
 
+class ExpertFactDecision(models.Model):
+    class Decision(models.TextChoices):
+        CONFIRMED = "confirmed", "Confirmed"
+        CORRECTED = "corrected", "Corrected"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name="expert_fact_decisions")
+    field = models.ForeignKey("intelligence.FieldDefinition", on_delete=models.PROTECT, related_name="expert_decisions")
+    source_fact = models.ForeignKey(
+        "intelligence.ExtractedFact",
+        on_delete=models.PROTECT,
+        related_name="expert_decisions",
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="expert_fact_decisions",
+    )
+    decision = models.CharField(max_length=24, choices=Decision.choices, db_index=True)
+    corrected_value = models.JSONField(null=True, blank=True)
+    note = models.TextField(blank=True)
+    evidence_snapshot = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["case", "field"], name="uniq_case_authoritative_fact_decision")
+        ]
+
+
+class ReportClaim(models.Model):
+    class ClaimType(models.TextChoices):
+        FACT = "fact", "Fact"
+        INFERENCE = "inference", "Inference"
+        PROFESSIONAL_OPINION = "professional_opinion", "Professional opinion"
+        UNRESOLVED = "unresolved", "Unresolved"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    revision = models.ForeignKey(ReportRevision, on_delete=models.CASCADE, related_name="claims")
+    section = models.ForeignKey(ReportSection, on_delete=models.CASCADE, related_name="claims")
+    sequence = models.PositiveIntegerField(default=0)
+    claim_type = models.CharField(max_length=32, choices=ClaimType.choices, db_index=True)
+    text = models.TextField()
+    fact_keys = models.JSONField(default=list, blank=True)
+    evidence_snapshot = models.JSONField(default=list, blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["section__sequence", "sequence", "id"]
+
+
+class ReportClaimReview(models.Model):
+    class Decision(models.TextChoices):
+        ACCEPTED = "accepted", "Accepted"
+        NEEDS_EDIT = "needs_edit", "Needs edit"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    claim = models.ForeignKey(ReportClaim, on_delete=models.CASCADE, related_name="reviews")
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="report_claim_reviews",
+    )
+    decision = models.CharField(max_length=24, choices=Decision.choices, db_index=True)
+    note = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["claim", "reviewer"], name="uniq_claim_reviewer")
+        ]
+
+
 class ReportSectionReview(models.Model):
     class Decision(models.TextChoices):
         ACCEPTED = "accepted", "Accepted"
