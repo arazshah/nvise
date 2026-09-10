@@ -7,13 +7,42 @@ from apps.intelligence.models import CaseFieldIssue, ExtractedFact
 from apps.intelligence.playbooks import resolve_playbook
 
 from .composer import compose_professional_report
-from .models import Report, ReportApproval, ReportRevision, ReportSection, ReportSectionReview
+from .models import (
+    ExpertFactDecision,
+    Report,
+    ReportApproval,
+    ReportClaim,
+    ReportClaimReview,
+    ReportRevision,
+    ReportSection,
+    ReportSectionReview,
+)
+
+
+def _evidence_snapshot(item: Evidence) -> dict:
+    metadata = item.metadata or {}
+    return {
+        "evidence_id": str(item.id),
+        "source_kind": item.source_kind,
+        "start_ms": item.start_ms,
+        "end_ms": item.end_ms,
+        "filename": metadata.get("filename"),
+        "page": metadata.get("page"),
+        "document_type": metadata.get("document_type"),
+    }
 
 
 def _latest_fact_map(case: Case) -> dict:
     latest_run = case.extraction_runs.filter(status="completed").order_by("-completed_at", "-created_at").first()
     if latest_run is None:
         return {}
+    decisions = {
+        item.field_id: item
+        for item in ExpertFactDecision.objects.filter(
+            case=case,
+            source_fact__extraction_run=latest_run,
+        ).select_related("source_fact", "reviewer")
+    }
     result = {}
     facts = (
         ExtractedFact.objects.filter(extraction_run=latest_run)
@@ -25,26 +54,30 @@ def _latest_fact_map(case: Case) -> dict:
     for fact in facts:
         if fact.status == ExtractedFact.Status.CONFLICTED:
             continue
-        evidence_rows = []
-        for link in fact.evidence_links.all():
-            item = link.evidence
-            metadata = item.metadata or {}
-            evidence_rows.append(
-                {
-                    "evidence_id": str(item.id),
-                    "source_kind": item.source_kind,
-                    "start_ms": item.start_ms,
-                    "end_ms": item.end_ms,
-                    "filename": metadata.get("filename"),
-                    "page": metadata.get("page"),
-                    "document_type": metadata.get("document_type"),
-                }
-            )
+        decision = decisions.get(fact.field_id)
+        if decision and decision.source_fact_id == fact.id and decision.decision == ExpertFactDecision.Decision.REJECTED:
+            continue
+        evidence_rows = [_evidence_snapshot(link.evidence) for link in fact.evidence_links.all()]
+        value = fact.normalized_value if fact.normalized_value is not None else fact.value
+        expert_decision = None
+        if decision and decision.source_fact_id == fact.id:
+            if decision.decision == ExpertFactDecision.Decision.CORRECTED:
+                value = decision.corrected_value
+            expert_decision = {
+                "decision": decision.decision,
+                "note": decision.note,
+                "reviewer_id": str(decision.reviewer_id),
+                "updated_at": decision.updated_at.isoformat(),
+            }
         result[fact.field.key] = {
+            "fact_id": str(fact.id),
+            "field_id": str(fact.field_id),
             "label": fact.field.label,
-            "value": fact.normalized_value if fact.normalized_value is not None else fact.value,
+            "value": value,
+            "original_value": fact.normalized_value if fact.normalized_value is not None else fact.value,
             "confidence": fact.confidence,
             "evidence": evidence_rows,
+            "expert_decision": expert_decision,
         }
     return result
 
@@ -107,6 +140,19 @@ def _limitation_section_data(limitations: list[dict]) -> dict:
     return data
 
 
+def _claim_evidence(fact_keys: list[str], facts: dict) -> list[dict]:
+    seen = set()
+    rows = []
+    for key in fact_keys:
+        for item in (facts.get(key) or {}).get("evidence") or []:
+            evidence_id = item.get("evidence_id")
+            if not evidence_id or evidence_id in seen:
+                continue
+            seen.add(evidence_id)
+            rows.append(item)
+    return rows
+
+
 @transaction.atomic
 def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
     locked_case = Case.objects.select_for_update().select_related("created_by").get(pk=case.pk)
@@ -157,20 +203,32 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
             "unavailable_issues": sum(1 for item in limitations if item["resolution_status"] == CaseFieldIssue.Status.UNAVAILABLE),
             "waived_issues": sum(1 for item in limitations if item["resolution_status"] == CaseFieldIssue.Status.WAIVED),
             "limitation_count": len(limitations),
+            "expert_fact_decision_count": sum(1 for item in facts.values() if item.get("expert_decision")),
         },
         created_by=created_by,
     )
 
     limitation_data = _limitation_section_data(limitations)
-    for sequence, section in enumerate(composed["sections"]):
-        ReportSection.objects.create(
+    for sequence, section_payload in enumerate(composed["sections"]):
+        section = ReportSection.objects.create(
             revision=revision,
-            key=section["key"],
-            title=section["title"],
+            key=section_payload["key"],
+            title=section_payload["title"],
             sequence=sequence,
-            content=section["content"],
-            data=limitation_data if section["key"] == "limitations" else {},
+            content=section_payload["content"],
+            data=limitation_data if section_payload["key"] == "limitations" else {},
         )
+        for claim_sequence, claim in enumerate(section_payload.get("claims") or []):
+            ReportClaim.objects.create(
+                revision=revision,
+                section=section,
+                sequence=claim_sequence,
+                claim_type=claim["claim_type"],
+                text=claim["text"],
+                fact_keys=claim.get("fact_keys") or [],
+                evidence_snapshot=_claim_evidence(claim.get("fact_keys") or [], facts),
+                confidence=claim.get("confidence"),
+            )
 
     report.current_revision = revision
     report.status = Report.Status.READY_FOR_REVIEW
@@ -183,6 +241,7 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
             "report_id": str(report.id),
             "revision": revision.revision_number,
             "limitation_count": len(limitations),
+            "claim_count": revision.claims.count(),
             "playbook": playbook.key,
             "composer": composed.get("composer", "fallback"),
         },
@@ -197,6 +256,7 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
             "report_id": str(report.id),
             "revision": revision.revision_number,
             "limitation_count": len(limitations),
+            "claim_count": revision.claims.count(),
             "playbook": playbook.key,
             "composer": composed.get("composer", "fallback"),
             "composer_model": composed.get("model", ""),
@@ -210,7 +270,7 @@ def create_review_revision(*, case: Case, user, title: str, summary: str, sectio
     if case.status != Case.Status.READY_FOR_REVIEW:
         raise ValueError("Only reports ready for review can be edited")
     report = Report.objects.select_for_update().get(case=case)
-    current = ReportRevision.objects.prefetch_related("sections").get(pk=report.current_revision_id)
+    current = ReportRevision.objects.prefetch_related("sections__claims").get(pk=report.current_revision_id)
     next_revision = current.revision_number + 1
     revision = ReportRevision.objects.create(
         report=report,
@@ -226,7 +286,7 @@ def create_review_revision(*, case: Case, user, title: str, summary: str, sectio
         created_by=user,
     )
     for section in current.sections.order_by("sequence", "key"):
-        ReportSection.objects.create(
+        new_section = ReportSection.objects.create(
             revision=revision,
             key=section.key,
             title=section.title,
@@ -234,6 +294,17 @@ def create_review_revision(*, case: Case, user, title: str, summary: str, sectio
             content=section_contents.get(section.key, section.content).strip(),
             data=section.data,
         )
+        for claim in section.claims.order_by("sequence", "id"):
+            ReportClaim.objects.create(
+                revision=revision,
+                section=new_section,
+                sequence=claim.sequence,
+                claim_type=claim.claim_type,
+                text=claim.text,
+                fact_keys=claim.fact_keys,
+                evidence_snapshot=claim.evidence_snapshot,
+                confidence=claim.confidence,
+            )
     report.current_revision = revision
     report.save(update_fields=["current_revision", "updated_at"])
     CaseEvent.objects.create(
@@ -251,6 +322,117 @@ def create_review_revision(*, case: Case, user, title: str, summary: str, sectio
         metadata={"report_id": str(report.id), "from_revision": current.revision_number, "to_revision": revision.revision_number},
     )
     return revision
+
+
+@transaction.atomic
+def save_expert_fact_decision(*, case: Case, user, fact_id, decision: str, corrected_value=None, note: str = "") -> ExpertFactDecision:
+    if decision not in ExpertFactDecision.Decision.values:
+        raise ValueError("Invalid fact decision")
+    fact = (
+        ExtractedFact.objects.select_related("field", "extraction_run")
+        .prefetch_related("evidence_links__evidence")
+        .get(pk=fact_id, case=case)
+    )
+    latest_run = case.extraction_runs.filter(status="completed").order_by("-completed_at", "-created_at").first()
+    if latest_run is None or fact.extraction_run_id != latest_run.id:
+        raise ValueError("Only facts from the latest completed analysis can be reviewed")
+    if decision == ExpertFactDecision.Decision.CORRECTED:
+        if corrected_value is None or (isinstance(corrected_value, str) and not corrected_value.strip()):
+            raise ValueError("Corrected value is required")
+        if isinstance(corrected_value, str):
+            corrected_value = corrected_value.strip()
+    else:
+        corrected_value = None
+    evidence_snapshot = [_evidence_snapshot(link.evidence) for link in fact.evidence_links.all()]
+    row, _ = ExpertFactDecision.objects.update_or_create(
+        case=case,
+        field=fact.field,
+        defaults={
+            "source_fact": fact,
+            "reviewer": user,
+            "decision": decision,
+            "corrected_value": corrected_value,
+            "note": note.strip(),
+            "evidence_snapshot": evidence_snapshot,
+        },
+    )
+    report = Report.objects.filter(case=case).first()
+    if report and report.current_revision_id:
+        report.status = Report.Status.DRAFT
+        report.save(update_fields=["status", "updated_at"])
+        case.report_status = Case.ReportStatus.DRAFT
+        case.save(update_fields=["report_status", "updated_at"])
+    CaseEvent.objects.create(
+        case=case,
+        event_type="case.fact_reviewed",
+        actor=user,
+        payload={
+            "field_key": fact.field.key,
+            "fact_id": str(fact.id),
+            "decision": decision,
+            "report_marked_stale": bool(report and report.current_revision_id),
+        },
+    )
+    record_audit_event(
+        event_type="case.fact_reviewed",
+        actor=user,
+        case=case,
+        object_type="expert_fact_decision",
+        object_id=row.id,
+        metadata={
+            "field_key": fact.field.key,
+            "fact_id": str(fact.id),
+            "decision": decision,
+            "corrected_value": corrected_value,
+            "evidence_ids": [item["evidence_id"] for item in evidence_snapshot],
+        },
+    )
+    return row
+
+
+@transaction.atomic
+def save_claim_review(*, case: Case, user, claim_id, decision: str, note: str = "") -> ReportClaimReview:
+    report = Report.objects.select_for_update().get(case=case)
+    if report.status != Report.Status.READY_FOR_REVIEW or report.current_revision_id is None:
+        raise ValueError("Report is not ready for claim review")
+    if decision not in ReportClaimReview.Decision.values:
+        raise ValueError("Invalid claim review decision")
+    claim = ReportClaim.objects.select_related("revision", "section").get(
+        pk=claim_id,
+        revision_id=report.current_revision_id,
+    )
+    review, _ = ReportClaimReview.objects.update_or_create(
+        claim=claim,
+        reviewer=user,
+        defaults={"decision": decision, "note": note.strip()},
+    )
+    CaseEvent.objects.create(
+        case=case,
+        event_type="report.claim_reviewed",
+        actor=user,
+        payload={
+            "revision": claim.revision.revision_number,
+            "claim_id": str(claim.id),
+            "claim_type": claim.claim_type,
+            "decision": decision,
+        },
+    )
+    record_audit_event(
+        event_type="report.claim_reviewed",
+        actor=user,
+        case=case,
+        object_type="report_claim_review",
+        object_id=review.id,
+        metadata={
+            "revision": claim.revision.revision_number,
+            "claim_id": str(claim.id),
+            "claim_type": claim.claim_type,
+            "decision": decision,
+            "fact_keys": claim.fact_keys,
+            "evidence_ids": [item.get("evidence_id") for item in claim.evidence_snapshot if item.get("evidence_id")],
+        },
+    )
+    return review
 
 
 @transaction.atomic
@@ -326,6 +508,15 @@ def review_progress(*, revision: ReportRevision, user) -> dict:
     needs_edit = reviews.filter(decision=ReportSectionReview.Decision.NEEDS_EDIT).count()
     rejected = reviews.filter(decision=ReportSectionReview.Decision.REJECTED).count()
     reviewed = reviews.count()
+
+    claim_total = revision.claims.count()
+    claim_reviews = ReportClaimReview.objects.filter(claim__revision=revision, reviewer=user)
+    claim_accepted = claim_reviews.filter(decision=ReportClaimReview.Decision.ACCEPTED).count()
+    claim_needs_edit = claim_reviews.filter(decision=ReportClaimReview.Decision.NEEDS_EDIT).count()
+    claim_rejected = claim_reviews.filter(decision=ReportClaimReview.Decision.REJECTED).count()
+    claim_reviewed = claim_reviews.count()
+    sections_ready = total > 0 and accepted == total
+    claims_ready = claim_total == 0 or claim_accepted == claim_total
     return {
         "total": total,
         "reviewed": reviewed,
@@ -333,7 +524,13 @@ def review_progress(*, revision: ReportRevision, user) -> dict:
         "needs_edit": needs_edit,
         "rejected": rejected,
         "remaining": max(total - reviewed, 0),
-        "can_approve": total > 0 and accepted == total,
+        "claim_total": claim_total,
+        "claim_reviewed": claim_reviewed,
+        "claim_accepted": claim_accepted,
+        "claim_needs_edit": claim_needs_edit,
+        "claim_rejected": claim_rejected,
+        "claim_remaining": max(claim_total - claim_reviewed, 0),
+        "can_approve": sections_ready and claims_ready,
     }
 
 
@@ -345,7 +542,7 @@ def approve_report(*, case: Case, user, note: str = "") -> Report:
     revision = ReportRevision.objects.get(pk=report.current_revision_id)
     progress = review_progress(revision=revision, user=user)
     if not progress["can_approve"]:
-        raise ValueError("All sections must be explicitly accepted by the approving expert")
+        raise ValueError("All report sections and material claims must be explicitly accepted by the approving expert")
     approval = ReportApproval.objects.create(report=report, revision=revision, approved_by=user, note=note)
     report.status = Report.Status.APPROVED
     report.save(update_fields=["status", "updated_at"])
