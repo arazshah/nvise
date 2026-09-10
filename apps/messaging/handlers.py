@@ -1,7 +1,8 @@
+from datetime import timedelta
+
 from asgiref.sync import async_to_sync
 from django.db import transaction
 from django.utils import timezone
-from datetime import timedelta
 
 from apps.cases.actions import complete_case_action, next_best_action, sync_system_actions
 from apps.cases.models import Case, CaseAction
