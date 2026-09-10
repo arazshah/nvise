@@ -19,12 +19,12 @@ def _case_for_user(user, case_code: str) -> Case:
 
 def _fact_rows(revision, case):
     decisions = {
-        item.field_id: item
+        str(item.field_id): item
         for item in ExpertFactDecision.objects.filter(case=case).select_related("field", "source_fact", "reviewer")
     }
     rows = []
     for key, fact in (revision.structured_data.get("facts") or {}).items():
-        field_id = fact.get("field_id")
+        field_id = str(fact.get("field_id") or "")
         decision = decisions.get(field_id)
         rows.append({"key": key, "fact": fact, "decision": decision})
     return rows
