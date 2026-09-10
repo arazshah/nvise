@@ -6,8 +6,11 @@ from django.db.models import Count, Q
 from django.http import FileResponse, Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
-from apps.cases.models import Case
+from apps.cases.actions import complete_case_action, create_manual_action, next_best_action, open_case_actions
+from apps.cases.models import Case, CaseAction
 from apps.cases.services import CaseTransitionError, archive_case, reopen_case
 from apps.documents.models import GeneratedDocument
 from apps.messaging.models import CaseMessage
@@ -131,6 +134,11 @@ def dashboard(request):
         .order_by("-updated_at")[:5]
     )
 
+    for case in recent_cases:
+        case.next_action = next_best_action(case)
+    for case in action_cases:
+        case.next_action = next_best_action(case)
+
     display_name = getattr(request.user, "display_name", "") or request.user.get_username()
     return render(
         request,
@@ -202,6 +210,8 @@ def case_repository(request, case_code: str):
     }
     rows = _message_rows(_repository_messages(case, kind))
     report = Report.objects.filter(case=case).select_related("current_revision").first()
+    actions = list(open_case_actions(case)[:20])
+    next_action = next_best_action(case)
     return render(
         request,
         "portal/case_repository.html",
@@ -211,6 +221,8 @@ def case_repository(request, case_code: str):
             "counts": counts,
             "rows": rows,
             "report": report,
+            "case_actions": actions,
+            "next_action": next_action,
         },
     )
 
@@ -394,3 +406,39 @@ def download_document(request, case_code: str, document_id):
     response["X-Content-Type-Options"] = "nosniff"
     response["Cache-Control"] = "private, no-store"
     return response
+
+
+@login_required
+@require_POST
+def create_case_action_view(request, case_code: str):
+    case = _accessible_case(request.user, case_code)
+    due_at = None
+    raw_due = request.POST.get("due_at", "").strip()
+    if raw_due:
+        due_at = parse_datetime(raw_due)
+        if due_at is None:
+            return HttpResponseBadRequest("زمان یادآوری معتبر نیست.")
+        if timezone.is_naive(due_at):
+            due_at = timezone.make_aware(due_at, timezone.get_current_timezone())
+    try:
+        create_manual_action(
+            case=case,
+            user=request.user,
+            title=request.POST.get("title", ""),
+            description=request.POST.get("description", ""),
+            due_at=due_at,
+        )
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+    return redirect("portal:case-repository", case_code=case.case_code)
+
+
+@login_required
+@require_POST
+def complete_case_action_view(request, case_code: str, action_id):
+    case = _accessible_case(request.user, case_code)
+    try:
+        complete_case_action(case=case, action_id=action_id, user=request.user)
+    except (CaseAction.DoesNotExist, ValueError):
+        return HttpResponseBadRequest("این اقدام قابل تکمیل نیست.")
+    return redirect("portal:case-repository", case_code=case.case_code)
