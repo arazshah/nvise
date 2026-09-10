@@ -4,13 +4,19 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from apps.evidence.services import replace_document_page_evidence, replace_image_analysis_evidence
 from apps.messaging.models import CaseMessage
 from apps.messaging.providers.bale import BaleProvider
 from apps.messaging.providers.bale.client import BaleFileTooLargeError
 from apps.system.integrations import get_bale_config
 
+from .document_intelligence import (
+    analyze_image_bytes,
+    classify_document_text,
+    extract_document_pages,
+)
 from .models import CaseAttachment, ProcessingAttempt, ProcessingJob
-from .storage import store_private_bytes
+from .storage import read_private_bytes, store_private_bytes
 
 
 def _next_job_type(message_type: str) -> str | None:
@@ -28,6 +34,121 @@ def _enqueue_next_job(job: ProcessingJob) -> None:
         from apps.transcription.tasks import transcribe_audio
 
         transcribe_audio.delay(str(job.id))
+    elif job.job_type == ProcessingJob.JobType.EXTRACT_DOCUMENT:
+        extract_document.delay(str(job.id))
+    elif job.job_type == ProcessingJob.JobType.ANALYZE_IMAGE:
+        analyze_image.delay(str(job.id))
+
+
+def _begin_content_job(job_id: str, expected_type: str) -> tuple[ProcessingJob, ProcessingAttempt]:
+    with transaction.atomic():
+        job = (
+            ProcessingJob.objects.select_for_update()
+            .select_related("attachment__message__case")
+            .get(pk=job_id)
+        )
+        if job.status == ProcessingJob.Status.SUCCEEDED:
+            return job, None
+        if job.job_type != expected_type:
+            raise RuntimeError(f"Expected {expected_type}, got {job.job_type}")
+        if job.attachment.status != CaseAttachment.Status.STORED or not job.attachment.storage_key:
+            raise RuntimeError("Attachment is not stored yet")
+        job.status = ProcessingJob.Status.RUNNING
+        job.started_at = timezone.now()
+        job.attempts += 1
+        job.last_error = ""
+        job.save(update_fields=["status", "started_at", "attempts", "last_error", "updated_at"])
+        attempt = ProcessingAttempt.objects.create(job=job, attempt_number=job.attempts)
+        return job, attempt
+
+
+def _complete_content_job(*, job: ProcessingJob, attempt: ProcessingAttempt, metadata: dict) -> None:
+    with transaction.atomic():
+        locked_job = ProcessingJob.objects.select_for_update().get(pk=job.pk)
+        locked_job.status = ProcessingJob.Status.SUCCEEDED
+        locked_job.finished_at = timezone.now()
+        locked_job.last_error = ""
+        locked_job.save(update_fields=["status", "finished_at", "last_error", "updated_at"])
+        locked_attempt = ProcessingAttempt.objects.select_for_update().get(pk=attempt.pk)
+        locked_attempt.succeeded = True
+        locked_attempt.finished_at = timezone.now()
+        locked_attempt.metadata = metadata
+        locked_attempt.save(update_fields=["succeeded", "finished_at", "metadata"])
+
+
+def _fail_content_job(*, job: ProcessingJob, attempt: ProcessingAttempt, exc: Exception) -> None:
+    with transaction.atomic():
+        locked_job = ProcessingJob.objects.select_for_update().get(pk=job.pk)
+        locked_job.status = ProcessingJob.Status.FAILED
+        locked_job.finished_at = timezone.now()
+        locked_job.last_error = str(exc)[:2000]
+        locked_job.save(update_fields=["status", "finished_at", "last_error", "updated_at"])
+        locked_attempt = ProcessingAttempt.objects.select_for_update().get(pk=attempt.pk)
+        locked_attempt.finished_at = timezone.now()
+        locked_attempt.error_class = exc.__class__.__name__
+        locked_attempt.error_message = str(exc)[:2000]
+        locked_attempt.save(update_fields=["finished_at", "error_class", "error_message"])
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+def extract_document(self, job_id: str) -> None:
+    job, attempt = _begin_content_job(job_id, ProcessingJob.JobType.EXTRACT_DOCUMENT)
+    if attempt is None:
+        return
+    try:
+        attachment = job.attachment
+        content = read_private_bytes(attachment.storage_key)
+        pages = extract_document_pages(
+            content,
+            mime_type=attachment.mime_type,
+            filename=attachment.original_name,
+        )
+        combined_text = "\n".join(str(page.get("text") or "") for page in pages)
+        document_type = classify_document_text(combined_text, attachment.original_name)
+        for page in pages:
+            if not page.get("document_type") or page.get("document_type") == "document":
+                page["document_type"] = document_type
+        evidence_count = replace_document_page_evidence(attachment=attachment, pages=pages)
+        _complete_content_job(
+            job=job,
+            attempt=attempt,
+            metadata={
+                "pages": len(pages),
+                "evidence_count": evidence_count,
+                "document_type": document_type,
+            },
+        )
+    except Exception as exc:
+        _fail_content_job(job=job, attempt=attempt, exc=exc)
+        raise
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
+def analyze_image(self, job_id: str) -> None:
+    job, attempt = _begin_content_job(job_id, ProcessingJob.JobType.ANALYZE_IMAGE)
+    if attempt is None:
+        return
+    try:
+        attachment = job.attachment
+        content = read_private_bytes(attachment.storage_key)
+        result = analyze_image_bytes(
+            content,
+            mime_type=attachment.mime_type or "image/jpeg",
+            context=attachment.original_name,
+        )
+        evidence_count = replace_image_analysis_evidence(attachment=attachment, result=result)
+        _complete_content_job(
+            job=job,
+            attempt=attempt,
+            metadata={
+                "evidence_count": evidence_count,
+                "document_type": result.get("document_type") or "image",
+                "uncertainty_notes": result.get("uncertainty_notes") or [],
+            },
+        )
+    except Exception as exc:
+        _fail_content_job(job=job, attempt=attempt, exc=exc)
+        raise
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
@@ -105,7 +226,6 @@ def fetch_attachment(self, job_id: str) -> None:
             attempt.metadata = {"bytes": len(content), "sha256": digest}
             attempt.save(update_fields=["succeeded", "finished_at", "metadata"])
 
-            next_job = None
             next_type = _next_job_type(attachment.message.message_type)
             if next_type:
                 next_job, _ = ProcessingJob.objects.get_or_create(
