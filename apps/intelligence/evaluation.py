@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from typing import Any
 
 from apps.reports.models import ExpertFactDecision, Report, ReportClaim
@@ -147,10 +148,11 @@ def evaluate_golden_case(golden_case: GoldenCase, *, git_sha: str | None = None)
     passed = all(gates.values())
     latest_run_id = fact_details.get("latest_extraction_run_id")
     extraction_run = golden_case.case.extraction_runs.filter(pk=latest_run_id).first() if latest_run_id else None
+    revision_id = grounding_details.get("revision_id")
     return GoldenCaseEvaluation.objects.create(
         golden_case=golden_case,
         extraction_run=extraction_run,
-        report_revision_id=grounding_details.get("revision_id"),
+        report_revision_id=uuid.UUID(revision_id) if revision_id else None,
         status=GoldenCaseEvaluation.Status.PASSED if passed else GoldenCaseEvaluation.Status.FAILED,
         fact_recall=round(recall, 4),
         exact_fact_accuracy=round(accuracy, 4),
