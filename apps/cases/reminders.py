@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import BaleIdentity
+from apps.messaging.models import ConversationState
 from apps.messaging.providers.bale import BaleProvider
 from apps.system.integrations import get_bale_config
 
@@ -128,6 +129,15 @@ def deliver_reminder(reminder: CaseReminder) -> None:
         reminder_text(reminder),
         _reminder_keyboard(reminder.action),
     )
+    state, _ = ConversationState.objects.get_or_create(
+        user=reminder.user,
+        provider="bale",
+        external_chat_id=identity.external_chat_id,
+    )
+    pending = dict(state.pending_action or {})
+    pending["reminder_action_id"] = str(reminder.action_id)
+    state.pending_action = pending
+    state.save(update_fields=["pending_action", "updated_at"])
 
 
 @transaction.atomic
