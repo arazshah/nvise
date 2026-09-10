@@ -28,7 +28,12 @@ def test_public_home_and_guide_reflect_current_product_identity(client):
     home_text = home.content.decode("utf-8")
     assert "آراز شاه‌کرمی" in home_text
     assert "mail@araz.me" in home_text
-    assert "پرونده‌ات را نگه دار" in home_text
+    assert "از اطلاعات پراکنده" in home_text
+    assert "گزارش حرفه‌ای و قابل اتکا" in home_text
+    assert "وکلا و دفاتر حقوقی" in home_text
+    assert "کارشناسان رسمی" in home_text
+    assert "کارشناسان بیمه و ارزیابان خسارت" in home_text
+    assert "۳۰ روز" in home_text
     assert "/finish" not in home_text
 
     guide = client.get("/guide/")
