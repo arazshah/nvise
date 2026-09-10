@@ -21,7 +21,8 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"{item.golden_case.key}: {item.status} | overall={item.overall_score:.3f} "
                 f"fact_recall={item.fact_recall:.3f} accuracy={item.exact_fact_accuracy:.3f} "
-                f"redundant_questions={item.redundant_question_rate:.3f} grounding={item.claim_grounding_ratio:.3f}"
+                f"redundant_questions={item.redundant_question_rate:.3f} "
+                f"expert_gap_recall={item.expert_gap_recall:.3f} grounding={item.claim_grounding_ratio:.3f}"
             )
             if item.status == item.Status.FAILED:
                 failed.append(item)
