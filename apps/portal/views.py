@@ -1,5 +1,6 @@
 from io import BytesIO
 
+from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
@@ -9,8 +10,9 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from apps.cases.action_suggestions import accept_action_suggestion, generate_action_suggestions, reject_action_suggestion
 from apps.cases.actions import complete_case_action, create_manual_action, next_best_action, open_case_actions, sync_system_actions
-from apps.cases.models import Case, CaseAction
+from apps.cases.models import Case, CaseAction, CaseActionSuggestion
 from apps.cases.services import CaseTransitionError, archive_case, reopen_case
 from apps.documents.models import GeneratedDocument
 from apps.messaging.models import CaseMessage
@@ -219,6 +221,31 @@ def case_repository(request, case_code: str):
     report = Report.objects.filter(case=case).select_related("current_revision").first()
     actions = list(open_case_actions(case)[:20])
     next_action = next_best_action(case)
+    suggestions = list(
+        case.action_suggestions.filter(status=CaseActionSuggestion.Status.PROPOSED)
+        .order_by("-created_at")[:10]
+    )
+    evidence_by_id = {
+        str(item.id): item
+        for item in case.evidence_items.filter(
+            id__in=[
+                evidence_id
+                for suggestion in suggestions
+                for evidence_id in (suggestion.source_evidence_ids or [])
+            ]
+        )
+    }
+    suggestion_rows = [
+        {
+            "suggestion": suggestion,
+            "sources": [
+                evidence_by_id[evidence_id]
+                for evidence_id in (suggestion.source_evidence_ids or [])
+                if evidence_id in evidence_by_id
+            ],
+        }
+        for suggestion in suggestions
+    ]
     return render(
         request,
         "portal/case_repository.html",
@@ -230,6 +257,7 @@ def case_repository(request, case_code: str):
             "report": report,
             "case_actions": actions,
             "next_action": next_action,
+            "suggestion_rows": suggestion_rows,
         },
     )
 
@@ -502,3 +530,39 @@ def today_view(request):
             "today_start": today_start,
         },
     )
+
+
+@login_required
+@require_POST
+def generate_case_action_suggestions_view(request, case_code: str):
+    case = _accessible_case(request.user, case_code)
+    try:
+        created = generate_action_suggestions(case)
+    except Exception:
+        messages.error(request, "پیشنهاد کارهای بعدی در حال حاضر آماده نشد. کمی بعد دوباره تلاش کنید.")
+    else:
+        if created:
+            messages.success(request, f"{len(created)} پیشنهاد جدید برای کارهای بعدی پیدا شد.")
+        else:
+            messages.info(request, "در مدارک فعلی پیشنهاد تازه و قابل اتکایی برای کار بعدی پیدا نشد.")
+    return redirect("portal:case-repository", case_code=case.case_code)
+
+
+@login_required
+@require_POST
+def accept_case_action_suggestion_view(request, case_code: str, suggestion_id):
+    case = _accessible_case(request.user, case_code)
+    suggestion = get_object_or_404(CaseActionSuggestion, pk=suggestion_id, case=case)
+    accept_action_suggestion(suggestion=suggestion, user=request.user)
+    messages.success(request, "پیشنهاد به کارهای پرونده اضافه شد.")
+    return redirect("portal:case-repository", case_code=case.case_code)
+
+
+@login_required
+@require_POST
+def reject_case_action_suggestion_view(request, case_code: str, suggestion_id):
+    case = _accessible_case(request.user, case_code)
+    suggestion = get_object_or_404(CaseActionSuggestion, pk=suggestion_id, case=case)
+    reject_action_suggestion(suggestion=suggestion, user=request.user)
+    messages.info(request, "پیشنهاد کنار گذاشته شد.")
+    return redirect("portal:case-repository", case_code=case.case_code)
