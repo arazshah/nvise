@@ -1,4 +1,4 @@
-INSURANCE_LOSS_GOLDEN_KEY = "insurance-loss-adjuster-001"
+INSURANCE_GOLDEN_KEY = "insurance-loss-adjuster-001"
 
 INSURANCE_NO_FOLLOWUP_FACT_KEYS = [
     "policy_number",
