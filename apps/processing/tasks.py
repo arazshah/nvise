@@ -40,13 +40,38 @@ def _enqueue_next_job(job: ProcessingJob) -> None:
         analyze_image.delay(str(job.id))
 
 
+def _resume_case_extraction(case_id: str) -> None:
+    from apps.intelligence.models import ExtractionRun
+    from apps.intelligence.tasks import extract_case_facts
+
+    pending = ProcessingJob.objects.filter(
+        attachment__message__case_id=case_id,
+        job_type__in=[
+            ProcessingJob.JobType.FETCH_ATTACHMENT,
+            ProcessingJob.JobType.TRANSCRIBE_AUDIO,
+            ProcessingJob.JobType.EXTRACT_DOCUMENT,
+            ProcessingJob.JobType.ANALYZE_IMAGE,
+        ],
+        status__in=[ProcessingJob.Status.PENDING, ProcessingJob.Status.RUNNING],
+    ).exists()
+    if pending:
+        return
+
+    run = (
+        ExtractionRun.objects.filter(case_id=case_id, status=ExtractionRun.Status.PENDING)
+        .order_by("-created_at")
+        .first()
+    )
+    if run is not None:
+        extract_case_facts.delay(str(run.id))
+
+
 def _begin_content_job(job_id: str, expected_type: str) -> tuple[ProcessingJob, ProcessingAttempt]:
     with transaction.atomic():
-        job = (
-            ProcessingJob.objects.select_for_update()
-            .select_related("attachment__message__case")
-            .get(pk=job_id)
-        )
+        # Lock only the ProcessingJob row. CaseMessage.case is nullable, so joining
+        # through attachment.message.case would make PostgreSQL apply FOR UPDATE
+        # to the nullable side of an outer join.
+        job = ProcessingJob.objects.select_for_update().get(pk=job_id)
         if job.status == ProcessingJob.Status.SUCCEEDED:
             return job, None
         if job.job_type != expected_type:
@@ -74,6 +99,10 @@ def _complete_content_job(*, job: ProcessingJob, attempt: ProcessingAttempt, met
         locked_attempt.finished_at = timezone.now()
         locked_attempt.metadata = metadata
         locked_attempt.save(update_fields=["succeeded", "finished_at", "metadata"])
+
+        case_id = locked_job.attachment.message.case_id
+        if case_id:
+            transaction.on_commit(lambda case_id=str(case_id): _resume_case_extraction(case_id))
 
 
 def _fail_content_job(*, job: ProcessingJob, attempt: ProcessingAttempt, exc: Exception) -> None:
