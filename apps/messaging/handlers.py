@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
 
-from apps.cases.actions import complete_case_action, next_best_action
+from apps.cases.actions import complete_case_action, next_best_action, sync_system_actions
 from apps.cases.models import Case, CaseAction
 from apps.cases.presentation import case_status_description, case_status_label
 from apps.cases.reminders import snooze_action
@@ -49,6 +49,7 @@ PROFILE_COMMANDS = {"👤 پروفایل حرفه‌ای", "پروفایل حر�
 NEXT_ACTION_COMMANDS = {"📌 اقدام بعدی", "اقدام بعدی"}
 REMINDER_DONE_COMMANDS = {"✅ انجام شد"}
 REMINDER_SNOOZE_COMMANDS = {"⏰ فردا یادآوری کن"}
+TODAY_COMMANDS = {"📋 کارهای امروز", "کارهای امروز"}
 BACK_TO_MENU_COMMANDS = {"↩️ بازگشت به منوی اصلی", "🏠 منوی اصلی"}
 
 
@@ -62,7 +63,8 @@ def main_menu_keyboard() -> dict:
     return {
         "keyboard": [
             [{"text": "➕ پرونده جدید"}, {"text": "📂 پرونده‌های من"}],
-            [{"text": "📁 پرونده فعال"}, {"text": "👤 پروفایل حرفه‌ای"}],
+            [{"text": "📋 کارهای امروز"}, {"text": "📁 پرونده فعال"}],
+            [{"text": "👤 پروفایل حرفه‌ای"}],
         ],
         "resize_keyboard": True,
     }
@@ -71,7 +73,7 @@ def main_menu_keyboard() -> dict:
 def active_case_keyboard(case: Case) -> dict:
     rows = [
         [{"text": "📊 وضعیت پرونده"}, {"text": "🧠 تحلیل پرونده"}],
-        [{"text": "📌 اقدام بعدی"}],
+        [{"text": "📌 اقدام بعدی"}, {"text": "📋 کارهای امروز"}],
         [{"text": "📂 پرونده‌های من"}, {"text": "🔄 تغییر پرونده"}],
         [{"text": "👤 پروفایل حرفه‌ای"}],
     ]
@@ -481,6 +483,33 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             _show_case_status(provider=provider, chat_id=message.external_chat_id, case=state.active_case)
         return
 
+
+
+    if text in TODAY_COMMANDS:
+        active_cases = list(
+            Case.objects.filter(
+                tenant__memberships__user=user,
+                tenant__memberships__is_active=True,
+                lifecycle_status=Case.LifecycleStatus.ACTIVE,
+            ).distinct().order_by("-updated_at")[:50]
+        )
+        for item in active_cases:
+            sync_system_actions(item)
+        actions = list(
+            CaseAction.objects.filter(
+                case__tenant__memberships__user=user,
+                case__tenant__memberships__is_active=True,
+                status=CaseAction.Status.OPEN,
+            ).select_related("case").distinct().order_by("-priority", "due_at", "created_at")[:8]
+        )
+        if not actions:
+            send_text(provider, message.external_chat_id, "✅ در حال حاضر کار بازی برای پیگیری ندارید.", main_menu_keyboard())
+            return
+        lines = ["📋 کارهای امروز", "━━━━━━━━━━━━━━"]
+        for action in actions:
+            lines.append(f"• {action.case.title or action.case.case_code}: {action.title}")
+        send_text(provider, message.external_chat_id, "\n".join(lines), main_menu_keyboard())
+        return
 
     if text in NEXT_ACTION_COMMANDS:
         if state.active_case is None:
