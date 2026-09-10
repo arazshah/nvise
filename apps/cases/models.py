@@ -144,3 +144,54 @@ class CaseAction(models.Model):
 
     def __str__(self) -> str:
         return f"{self.case.case_code}: {self.title}"
+
+
+class ReminderPreference(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reminder_preference",
+    )
+    reminders_enabled = models.BooleanField(default=True)
+    due_action_enabled = models.BooleanField(default=True)
+    report_review_enabled = models.BooleanField(default=True)
+    stale_case_enabled = models.BooleanField(default=True)
+    daily_digest_enabled = models.BooleanField(default=False)
+    weekly_digest_enabled = models.BooleanField(default=True)
+    quiet_start = models.TimeField(default="22:00")
+    quiet_end = models.TimeField(default="08:00")
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class CaseReminder(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "در انتظار"
+        DISPATCHING = "dispatching", "در حال ارسال"
+        SENT = "sent", "ارسال شده"
+        CANCELLED = "cancelled", "لغو شده"
+
+    class Channel(models.TextChoices):
+        BALE = "bale", "بله"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    action = models.ForeignKey(CaseAction, on_delete=models.CASCADE, related_name="reminders")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="case_reminders",
+    )
+    remind_at = models.DateTimeField(db_index=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True)
+    channel = models.CharField(max_length=16, choices=Channel.choices, default=Channel.BALE)
+    dedupe_key = models.CharField(max_length=160, unique=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["remind_at", "created_at"]
+        indexes = [
+            models.Index(fields=["status", "remind_at"], name="case_reminder_due_idx")
+        ]
