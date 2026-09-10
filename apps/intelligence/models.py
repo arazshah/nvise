@@ -114,6 +114,7 @@ class CaseFieldIssue(models.Model):
         MISSING = "missing", "Missing"
         CONFLICT = "conflict", "Conflict"
         INVALID = "invalid", "Invalid"
+        EXPERT_JUDGMENT = "expert_judgment", "Expert judgment"
 
     class Status(models.TextChoices):
         OPEN = "open", "باز"
@@ -124,7 +125,7 @@ class CaseFieldIssue(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name="field_issues")
     field = models.ForeignKey(FieldDefinition, on_delete=models.PROTECT, related_name="issues")
-    issue_type = models.CharField(max_length=16, choices=IssueType.choices, db_index=True)
+    issue_type = models.CharField(max_length=32, choices=IssueType.choices, db_index=True)
     details = models.JSONField(default=dict, blank=True)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN, db_index=True)
     attempt_count = models.PositiveSmallIntegerField(default=0)
