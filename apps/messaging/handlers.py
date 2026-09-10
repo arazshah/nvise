@@ -1,6 +1,7 @@
 from asgiref.sync import async_to_sync
 from django.db import transaction
 
+from apps.cases.actions import next_best_action
 from apps.cases.models import Case
 from apps.cases.presentation import case_status_description, case_status_label
 from apps.cases.services import (
@@ -42,6 +43,7 @@ APPROVE_COMMANDS = {"/approve", "تأیید گزارش", "✅ تأیید گزا�
 ARCHIVE_COMMANDS = {"📦 بایگانی پرونده"}
 CHANGE_CASE_COMMANDS = {"🔄 تغییر پرونده"}
 PROFILE_COMMANDS = {"👤 پروفایل حرفه‌ای", "پروفایل حرفه‌ای"}
+NEXT_ACTION_COMMANDS = {"📌 اقدام بعدی", "اقدام بعدی"}
 BACK_TO_MENU_COMMANDS = {"↩️ بازگشت به منوی اصلی", "🏠 منوی اصلی"}
 
 
@@ -64,6 +66,7 @@ def main_menu_keyboard() -> dict:
 def active_case_keyboard(case: Case) -> dict:
     rows = [
         [{"text": "📊 وضعیت پرونده"}, {"text": "🧠 تحلیل پرونده"}],
+        [{"text": "📌 اقدام بعدی"}],
         [{"text": "📂 پرونده‌های من"}, {"text": "🔄 تغییر پرونده"}],
         [{"text": "👤 پروفایل حرفه‌ای"}],
     ]
@@ -258,6 +261,12 @@ def _show_case_status(*, provider, chat_id: str, case: Case) -> None:
     if hasattr(case, "report") and case.report.current_revision_id:
         report_revision = case.report.current_revision.revision_number
     report_text = f"نسخه {report_revision}" if report_revision else "هنوز تولید نشده"
+    next_action = next_best_action(case)
+    next_action_text = (
+        f"\n\n📌 اقدام بعدی پیشنهادی: {next_action.title}\n↳ {next_action.description}"
+        if next_action else
+        "\n\n✅ در حال حاضر اقدام بازی برای این پرونده ثبت نشده است."
+    )
     send_text(
         provider,
         chat_id,
@@ -267,7 +276,8 @@ def _show_case_status(*, provider, chat_id: str, case: Case) -> None:
         f"🧭 نوع پرونده: {case.case_type_key or 'هنوز انتخاب نشده'}\n\n"
         f"💬 پیام‌های ثبت‌شده: {messages}\n🎙 پیام صوتی: {voices}\n🖼 تصویر: {images}\n📎 مدرک: {documents}\n"
         f"🧩 موارد نیازمند تکمیل: {open_issues}\n📄 گزارش: {report_text}\n\n"
-        f"{case_status_label(case.status)}\n↳ {case_status_description(case.status)}",
+        f"{case_status_label(case.status)}\n↳ {case_status_description(case.status)}"
+        f"{next_action_text}",
         active_case_keyboard(case),
     )
 
@@ -420,6 +430,23 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
             send_text(provider, message.external_chat_id, "📭 در حال حاضر پرونده فعالی ندارید.", main_menu_keyboard())
         else:
             _show_case_status(provider=provider, chat_id=message.external_chat_id, case=state.active_case)
+        return
+
+
+    if text in NEXT_ACTION_COMMANDS:
+        if state.active_case is None:
+            send_text(provider, message.external_chat_id, "📭 ابتدا یک پرونده را فعال کنید.", main_menu_keyboard())
+            return
+        action = next_best_action(state.active_case)
+        if action is None:
+            send_text(provider, message.external_chat_id, "✅ در حال حاضر اقدام بازی برای این پرونده وجود ندارد.", active_case_keyboard(state.active_case))
+            return
+        send_text(
+            provider,
+            message.external_chat_id,
+            f"📌 اقدام بعدی پیشنهادی\n━━━━━━━━━━━━━━\n{action.title}\n\n{action.description}",
+            active_case_keyboard(state.active_case),
+        )
         return
 
     if normalized_text in STATUS_COMMANDS:
