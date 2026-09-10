@@ -27,6 +27,11 @@ urlpatterns = [
         name="analysis-generate-report",
     ),
     path("cases/<str:case_code>/review/", views.case_review, name="case-review"),
+    path(
+        "cases/<str:case_code>/review/sections/<uuid:section_id>/",
+        views.review_section,
+        name="review-section",
+    ),
     path("cases/<str:case_code>/archive/", views.archive_case_view, name="archive-case"),
     path("cases/<str:case_code>/reopen/", views.reopen_case_view, name="reopen-case"),
     path(
