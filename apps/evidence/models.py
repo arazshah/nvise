@@ -11,6 +11,8 @@ class Evidence(models.Model):
     class SourceKind(models.TextChoices):
         MESSAGE = "message", "Message"
         TRANSCRIPT_SEGMENT = "transcript_segment", "Transcript segment"
+        DOCUMENT_PAGE = "document_page", "Document page"
+        IMAGE_ANALYSIS = "image_analysis", "Image analysis"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name="evidence_items")
@@ -45,6 +47,11 @@ class Evidence(models.Model):
                         source_kind="transcript_segment",
                         message__isnull=True,
                         transcript_segment__isnull=False,
+                    )
+                    | models.Q(
+                        source_kind__in=["document_page", "image_analysis"],
+                        message__isnull=False,
+                        transcript_segment__isnull=True,
                     )
                 ),
                 name="evidence_valid_source",
