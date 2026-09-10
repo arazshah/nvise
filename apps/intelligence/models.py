@@ -152,11 +152,7 @@ class FollowUpQuestion(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name="follow_up_questions")
-    issue = models.OneToOneField(
-        CaseFieldIssue,
-        on_delete=models.CASCADE,
-        related_name="follow_up_question",
-    )
+    issue = models.OneToOneField(CaseFieldIssue, on_delete=models.CASCADE, related_name="follow_up_question")
     question_text = models.TextField()
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True)
     answer_evidence = models.ForeignKey(
@@ -181,8 +177,11 @@ class GoldenCase(models.Model):
     is_active = models.BooleanField(default=True, db_index=True)
     expected_facts = models.JSONField(default=dict, blank=True)
     no_followup_fact_keys = models.JSONField(default=list, blank=True)
+    expected_expert_judgment_fact_keys = models.JSONField(default=list, blank=True)
+    report_rubric = models.JSONField(default=dict, blank=True)
     minimum_grounding_ratio = models.FloatField(default=0.90)
     minimum_fact_recall = models.FloatField(default=0.90)
+    minimum_expert_gap_recall = models.FloatField(default=0.80)
     maximum_redundant_question_rate = models.FloatField(default=0.05)
     expert_report_score = models.FloatField(null=True, blank=True)
     notes = models.TextField(blank=True)
@@ -212,6 +211,7 @@ class GoldenCaseEvaluation(models.Model):
     fact_recall = models.FloatField(default=0)
     exact_fact_accuracy = models.FloatField(default=0)
     redundant_question_rate = models.FloatField(default=0)
+    expert_gap_recall = models.FloatField(default=1.0)
     claim_grounding_ratio = models.FloatField(default=0)
     report_quality_score = models.FloatField(null=True, blank=True)
     overall_score = models.FloatField(default=0)
