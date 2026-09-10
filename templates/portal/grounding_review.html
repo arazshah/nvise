@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>کنترل ادعاها و داده‌ها | نویسه</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif;line-height:1.8}.wrap{max-width:1180px;margin:28px auto;padding:0 18px}.card{background:#fff;border:1px solid #e7ebf2;border-radius:20px;padding:22px;margin-bottom:18px;box-shadow:0 10px 32px rgba(30,41,59,.05)}.hero{background:linear-gradient(135deg,#fff,#eef2ff)}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.btn{display:inline-flex;border:0;border-radius:12px;padding:10px 15px;text-decoration:none;font:inherit;font-weight:800;cursor:pointer;background:#1e293b;color:#fff}.btn.secondary{background:#eef2ff;color:#312e81}.btn.good{background:#15803d}.btn.warn{background:#b45309}.btn.bad{background:#b91c1c}.badge{display:inline-flex;padding:5px 10px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:12px;font-weight:800}.badge.good{background:#ecfdf3;color:#166534}.badge.warn{background:#fff7ed;color:#9a3412}.badge.bad{background:#fef2f2;color:#991b1b}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.fact,.claim{border:1px solid #e5e7eb;border-radius:16px;padding:16px;margin-top:12px}.fact.corrected{border-right:5px solid #2563eb}.fact.confirmed{border-right:5px solid #16a34a}.fact.rejected{border-right:5px solid #dc2626}.muted{color:#667085}.source{display:inline-flex;margin:4px;padding:4px 8px;border-radius:999px;background:#f1f5f9;font-size:12px}.field,textarea,select{width:100%;font:inherit;border:1px solid #d7deea;border-radius:12px;padding:10px 12px;margin-top:6px}textarea{min-height:78px}.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}.actions label{border:1px solid #e5e7eb;border-radius:10px;padding:8px;font-weight:700}.claim.fact-claim{border-right:5px solid #2563eb}.claim.inference{border-right:5px solid #7c3aed}.claim.professional_opinion{border-right:5px solid #d97706}.claim.unresolved{border-right:5px solid #dc2626}.stale{background:#fff7ed;border-color:#fdba74}.fact-keys{display:flex;gap:6px;flex-wrap:wrap}.fact-key{font-size:12px;background:#eff6ff;padding:4px 8px;border-radius:999px}.evidence-box{background:#f8fafc;border-radius:12px;padding:10px;margin-top:8px}.top-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}@media(max-width:800px){.grid{grid-template-columns:1fr}.actions{grid-template-columns:1fr}.wrap{padding:0 10px}}
+  </style>
+</head>
+<body><div class="wrap">
+  <div class="card hero">
+    <div class="badge">نویسه • Claim-level Grounding</div>
+    <h1 style="margin-bottom:4px">🔗 کنترل ادعاها و داده‌های گزارش</h1>
+    <p class="muted">{{ case.title|default:case.case_code }} • {{ case.case_code }}</p>
+    <p>اینجا منبع حقیقت پرونده را کنترل می‌کنید: ابتدا Factهای استخراج‌شده را تأیید، اصلاح یا رد کنید؛ سپس ادعاهای مهم گزارش را با شواهدشان بررسی کنید.</p>
+    <div class="top-actions"><a class="btn secondary" href="{% url 'portal:case-review' case.case_code %}">← بازگشت به بررسی گزارش</a><a class="btn secondary" href="{% url 'portal:case-repository' case.case_code %}">📁 مخزن پرونده</a></div>
+  </div>
+
+  {% if report_stale %}
+  <div class="card stale">
+    <h2 style="margin-top:0">♻️ گزارش فعلی بعد از اصلاح Factها نیازمند بازسازی است</h2>
+    <p>اصلاح کارشناس ثبت شده و نسخه قبلی برای جلوگیری از تأیید اطلاعات قدیمی، موقتاً از حالت آماده تأیید خارج شده است.</p>
+    <form method="post" action="{% url 'portal:regenerate-grounded-report' case.case_code %}">{% csrf_token %}<button class="btn warn" type="submit">بازسازی گزارش با اصلاحات کارشناسی</button></form>
+  </div>
+  {% endif %}
+
+  {% if revision %}
+  <div class="grid">
+    <section>
+      <div class="card">
+        <h2>🧾 Fact Ledger قابل اصلاح</h2>
+        <p class="muted">مقدار اصلی AI حذف یا overwrite نمی‌شود؛ تصمیم شما به‌عنوان لایه کارشناسی روی آن قرار می‌گیرد.</p>
+        {% for row in fact_rows %}
+        <div class="fact {% if row.decision %}{{ row.decision.decision }}{% endif %}">
+          <div class="row"><strong>{{ row.fact.label }}</strong>{% if row.fact.confidence != None %}<span class="badge">اطمینان {{ row.fact.confidence|floatformat:2 }}</span>{% endif %}</div>
+          <div><b>مقدار فعلی:</b> {{ row.fact.value }}</div>
+          {% if row.fact.original_value != row.fact.value %}<div class="muted"><b>مقدار اولیه AI:</b> {{ row.fact.original_value }}</div>{% endif %}
+          <div class="evidence-box"><b>منابع:</b><br>{% for item in row.fact.evidence %}<span class="source">{% if item.filename %}{{ item.filename }}{% else %}{{ item.source_kind }}{% endif %}{% if item.page %} • صفحه {{ item.page }}{% endif %}{% if item.start_ms != None %} • صوت {{ item.start_ms }}–{{ item.end_ms }}ms{% endif %}</span>{% empty %}<span class="muted">Evidence مستقیم ثبت نشده است.</span>{% endfor %}</div>
+          {% if row.decision %}<p class="muted">تصمیم فعلی: <b>{{ row.decision.get_decision_display }}</b>{% if row.decision.note %} • {{ row.decision.note }}{% endif %}</p>{% endif %}
+          <form method="post" action="{% url 'portal:fact-decision' case.case_code row.fact.fact_id %}">{% csrf_token %}
+            <div class="actions">
+              <label><input type="radio" name="decision" value="confirmed" required {% if row.decision.decision == 'confirmed' %}checked{% endif %}> ✅ تأیید Fact</label>
+              <label><input type="radio" name="decision" value="corrected" required {% if row.decision.decision == 'corrected' %}checked{% endif %}> ✏️ اصلاح Fact</label>
+              <label><input type="radio" name="decision" value="rejected" required {% if row.decision.decision == 'rejected' %}checked{% endif %}> ⛔ رد Fact</label>
+            </div>
+            <label>مقدار صحیح در صورت اصلاح<input class="field" name="corrected_value" value="{% if row.decision.decision == 'corrected' %}{{ row.decision.corrected_value }}{% endif %}"></label>
+            <label>یادداشت کارشناسی<textarea name="note">{% if row.decision %}{{ row.decision.note }}{% endif %}</textarea></label>
+            <button class="btn secondary" type="submit">ثبت تصمیم Fact</button>
+          </form>
+        </div>
+        {% empty %}<p class="muted">Fact قابل بررسی در این نسخه وجود ندارد.</p>{% endfor %}
+      </div>
+    </section>
+
+    <section>
+      <div class="card">
+        <h2>🧠 ادعاهای مهم گزارش</h2>
+        <p class="muted">هر ادعا به Factهای پشتیبان و Evidence واقعی backend متصل است. برای تأیید نهایی گزارش، ادعاهای این نسخه نیز باید بررسی شوند.</p>
+        {% for row in claim_rows %}
+        <div class="claim {% if row.claim.claim_type == 'fact' %}fact-claim{% else %}{{ row.claim.claim_type }}{% endif %}">
+          <div class="row"><span class="badge">{{ row.claim.get_claim_type_display }}</span><span class="muted">{{ row.claim.section.title }}</span></div>
+          <p><strong>{{ row.claim.text }}</strong></p>
+          <div class="fact-keys">{% for key in row.claim.fact_keys %}<span class="fact-key">Fact: {{ key }}</span>{% empty %}<span class="muted">این ادعا Fact مستقیم ندارد و باید با احتیاط کارشناسی بررسی شود.</span>{% endfor %}</div>
+          <div class="evidence-box"><b>Evidence:</b><br>{% for item in row.claim.evidence_snapshot %}<span class="source">{% if item.filename %}{{ item.filename }}{% else %}{{ item.source_kind }}{% endif %}{% if item.page %} • صفحه {{ item.page }}{% endif %}{% if item.start_ms != None %} • {{ item.start_ms }}–{{ item.end_ms }}ms{% endif %}</span>{% empty %}<span class="badge warn">بدون Evidence مستقیم</span>{% endfor %}</div>
+          {% if row.review %}<p class="muted">تصمیم فعلی: <b>{{ row.review.get_decision_display }}</b>{% if row.review.note %} • {{ row.review.note }}{% endif %}</p>{% endif %}
+          {% if report.status == 'ready_for_review' %}
+          <form method="post" action="{% url 'portal:claim-decision' case.case_code row.claim.id %}">{% csrf_token %}
+            <select name="decision" required><option value="">تصمیم درباره این ادعا</option><option value="accepted" {% if row.review.decision == 'accepted' %}selected{% endif %}>✅ تأیید</option><option value="needs_edit" {% if row.review.decision == 'needs_edit' %}selected{% endif %}>✏️ نیازمند اصلاح</option><option value="rejected" {% if row.review.decision == 'rejected' %}selected{% endif %}>⛔ رد</option></select>
+            <textarea name="note" placeholder="یادداشت کارشناسی">{% if row.review %}{{ row.review.note }}{% endif %}</textarea>
+            <button class="btn secondary" type="submit">ثبت تصمیم ادعا</button>
+          </form>
+          {% endif %}
+        </div>
+        {% empty %}<p class="muted">این revision قدیمی است یا هنوز claim اتمیک برای آن تولید نشده است. تأیید بخش‌ها همچنان قابل استفاده است.</p>{% endfor %}
+      </div>
+    </section>
+  </div>
+  {% else %}<div class="card">هنوز گزارشی برای بررسی تولید نشده است.</div>{% endif %}
+</div></body></html>
