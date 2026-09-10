@@ -3,9 +3,11 @@ import pytest
 from apps.accounts.models import User
 from apps.cases.models import Case
 from apps.cases.services import create_case
+from apps.evidence.models import Evidence
 from apps.intelligence.catalog import ensure_fire_loss_schema
-from apps.intelligence.models import CaseFieldIssue, ExtractedFact, ExtractionRun
-from apps.intelligence.results import analysis_result_summary, waive_open_issues
+from apps.intelligence.models import CaseFieldIssue, ExtractedFact, ExtractionRun, FactEvidence
+from apps.intelligence.results import analysis_result_summary, analysis_result_text, waive_open_issues
+from apps.messaging.models import CaseMessage
 from apps.reports.services import generate_report_revision
 from apps.tenants.models import Tenant, TenantMembership
 
@@ -44,6 +46,55 @@ def test_analysis_summary_counts_facts_and_open_issues():
     assert summary["open_issues"] == 1
     assert summary["missing"] == 1
     assert summary["has_issues"] is True
+
+
+@pytest.mark.django_db
+def test_analysis_result_shows_fact_source_and_confidence():
+    user = User.objects.create_user(username="analysis-ledger")
+    tenant = Tenant.objects.create(name="Personal", slug="analysis-ledger")
+    TenantMembership.objects.create(tenant=tenant, user=user, role=TenantMembership.Role.OWNER)
+    case = create_case(user=user, tenant=tenant, title="پرونده مستند")
+    schema = ensure_fire_loss_schema()
+    run = ExtractionRun.objects.create(
+        case=case,
+        schema=schema,
+        provider="test",
+        status=ExtractionRun.Status.COMPLETED,
+    )
+    field = schema.fields.get(key="policy_number")
+    fact = ExtractedFact.objects.create(
+        case=case,
+        field=field,
+        extraction_run=run,
+        value="۱۴۰۳/۳۱۱/۱۲۵/۳۲۶۸۳/۱۴۴",
+        confidence=0.96,
+    )
+    message = CaseMessage.objects.create(
+        user=user,
+        case=case,
+        assignment_status=CaseMessage.AssignmentStatus.ASSIGNED,
+        provider="bale",
+        external_chat_id="ledger-chat",
+        external_message_id="ledger-document",
+        message_type=CaseMessage.MessageType.DOCUMENT,
+    )
+    evidence = Evidence.objects.create(
+        case=case,
+        source_kind=Evidence.SourceKind.DOCUMENT_PAGE,
+        message=message,
+        text="شماره بیمه‌نامه ۱۴۰۳/۳۱۱/۱۲۵/۳۲۶۸۳/۱۴۴",
+        metadata={"filename": "بیمه‌نامه.pdf", "page": 1, "method": "pdf_text"},
+    )
+    FactEvidence.objects.create(fact=fact, evidence=evidence, relevance=1.0)
+
+    text = analysis_result_text(case)
+    summary = analysis_result_summary(case)
+
+    assert summary["sourced_facts"] == 1
+    assert summary["high_confidence_facts"] == 1
+    assert "بیمه‌نامه.pdf، صفحه 1" in text
+    assert "اطمینان 96٪" in text
+    assert "۱۴۰۳/۳۱۱/۱۲۵/۳۲۶۸۳/۱۴۴" in text
 
 
 @pytest.mark.django_db
