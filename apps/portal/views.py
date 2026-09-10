@@ -13,8 +13,13 @@ from apps.documents.models import GeneratedDocument
 from apps.messaging.models import CaseMessage
 from apps.processing.models import CaseAttachment
 from apps.processing.storage import read_private_bytes
-from apps.reports.models import Report
-from apps.reports.services import approve_report, create_review_revision
+from apps.reports.models import Report, ReportSectionReview
+from apps.reports.services import (
+    approve_report,
+    create_review_revision,
+    review_progress,
+    save_section_review,
+)
 
 from .models import PortalAccessToken, ReviewAccessToken
 from .services import (
@@ -256,14 +261,41 @@ def reopen_case_view(request, case_code: str):
     return redirect("portal:case-repository", case_code=case.case_code)
 
 
+def _fact_review_rows(revision, evidence_by_id):
+    if revision is None:
+        return []
+    rows = []
+    for key, fact in (revision.structured_data.get("facts") or {}).items():
+        sources = []
+        for ref in fact.get("evidence") or []:
+            item = evidence_by_id.get(str(ref.get("evidence_id")))
+            if item is not None:
+                sources.append({"evidence": item, "reference": ref})
+        rows.append({"key": key, "fact": fact, "sources": sources})
+    return rows
+
+
 @login_required
 @require_http_methods(["GET"])
 def case_review(request, case_code: str):
     case = _reviewable_case(request.user, case_code)
     report = Report.objects.filter(case=case).select_related("current_revision").first()
     revision = report.current_revision if report else None
-    sections = revision.sections.all() if revision else []
-    evidence = case.evidence_items.order_by("created_at")
+    sections = list(revision.sections.all()) if revision else []
+    evidence = list(case.evidence_items.order_by("created_at"))
+    evidence_by_id = {str(item.id): item for item in evidence}
+    reviews = {}
+    progress = None
+    if revision:
+        reviews = {
+            str(item.section_id): item
+            for item in revision.section_reviews.filter(reviewer=request.user).select_related("section")
+        }
+        progress = review_progress(revision=revision, user=request.user)
+    section_rows = [
+        {"section": section, "review": reviews.get(str(section.id))}
+        for section in sections
+    ]
     documents = (
         GeneratedDocument.objects.filter(revision=revision).order_by("-created_at")
         if revision
@@ -277,10 +309,35 @@ def case_review(request, case_code: str):
             "report": report,
             "revision": revision,
             "sections": sections,
+            "section_rows": section_rows,
             "evidence": evidence,
+            "fact_rows": _fact_review_rows(revision, evidence_by_id),
+            "review_progress": progress,
             "documents": documents,
         },
     )
+
+
+@login_required
+@require_POST
+def review_section(request, case_code: str, section_id):
+    case = _reviewable_case(request.user, case_code)
+    try:
+        save_section_review(
+            case=case,
+            user=request.user,
+            section_id=section_id,
+            decision=request.POST.get("decision", ""),
+            note=request.POST.get("note", ""),
+            evidence_ids=request.POST.getlist("evidence_ids"),
+        )
+    except (ValueError, ReportSectionReview.DoesNotExist):
+        return HttpResponseBadRequest("تصمیم بررسی این بخش معتبر نیست یا به نسخه جاری گزارش تعلق ندارد.")
+    except Exception as exc:
+        if exc.__class__.__name__ == "DoesNotExist":
+            return HttpResponseBadRequest("بخش گزارش پیدا نشد یا متعلق به نسخه جاری نیست.")
+        raise
+    return redirect("portal:case-review", case_code=case.case_code)
 
 
 @login_required
@@ -309,7 +366,10 @@ def edit_report(request, case_code: str):
 @require_POST
 def approve_report_view(request, case_code: str):
     case = _reviewable_case(request.user, case_code)
-    approve_report(case=case, user=request.user, note=request.POST.get("note", ""))
+    try:
+        approve_report(case=case, user=request.user, note=request.POST.get("note", ""))
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
     return redirect("portal:case-review", case_code=case.case_code)
 
 
