@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>تنظیمات یادآوری | نویسه</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#172033;font-family:Vazirmatn,Tahoma,sans-serif;line-height:1.9}.wrap{max-width:880px;margin:auto;padding:30px 18px 60px}.card{background:#fff;border:1px solid #e6ebf3;border-radius:20px;padding:22px;margin-bottom:16px}.row{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid #eef2f7}.row:last-child{border-bottom:0}.muted{color:#667085;font-size:13px}.btn{border:0;border-radius:11px;background:#172033;color:#fff;padding:11px 15px;font:inherit;font-weight:800;cursor:pointer}.back{color:#3448a5;text-decoration:none}.times{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}input[type=time]{width:100%;padding:10px;border:1px solid #d7deea;border-radius:10px;font:inherit}@media(max-width:620px){.times{grid-template-columns:1fr}.row{align-items:flex-start}}
+  </style>
+</head>
+<body><main class="wrap">
+  <a class="back" href="{% url 'portal:dashboard' %}">بازگشت به داشبورد ←</a>
+  <section class="card"><h1 style="margin-top:0">🔔 تنظیمات یادآوری</h1><p class="muted">نویسه فقط برای کارهای واقعی پرونده به شما یادآوری می‌کند. می‌توانید نوع پیام‌ها و ساعات سکوت را خودتان تعیین کنید.</p></section>
+  <form method="post">{% csrf_token %}
+    <section class="card">
+      <div class="row"><div><strong>یادآوری‌ها فعال باشند</strong><div class="muted">کل سامانه یادآوری را روشن یا خاموش می‌کند.</div></div><input type="checkbox" name="reminders_enabled" {% if prefs.reminders_enabled %}checked{% endif %}></div>
+      <div class="row"><div><strong>کارهای موعددار</strong><div class="muted">برای کارهایی که زمان مشخص دارند پیام بله ارسال شود.</div></div><input type="checkbox" name="due_action_enabled" {% if prefs.due_action_enabled %}checked{% endif %}></div>
+      <div class="row"><div><strong>گزارش آماده بررسی</strong><div class="muted">اگر گزارش مدتی بدون بررسی بماند یادآوری شود.</div></div><input type="checkbox" name="report_review_enabled" {% if prefs.report_review_enabled %}checked{% endif %}></div>
+      <div class="row"><div><strong>پرونده بدون اقدام</strong><div class="muted">پرونده‌های فعال که مدت زیادی بدون اقدام مانده‌اند در یادآوری‌ها دیده شوند.</div></div><input type="checkbox" name="stale_case_enabled" {% if prefs.stale_case_enabled %}checked{% endif %}></div>
+      <div class="row"><div><strong>خلاصه روزانه</strong><div class="muted">فقط وقتی کار مهمی برای امروز دارید، یک خلاصه ارسال شود.</div></div><input type="checkbox" name="daily_digest_enabled" {% if prefs.daily_digest_enabled %}checked{% endif %}></div>
+      <div class="row"><div><strong>خلاصه هفتگی</strong><div class="muted">مرور پرونده‌ها، کارهای باز و گزارش‌های آماده در پایان هفته.</div></div><input type="checkbox" name="weekly_digest_enabled" {% if prefs.weekly_digest_enabled %}checked{% endif %}></div>
+    </section>
+    <section class="card"><h2>🌙 ساعات سکوت</h2><p class="muted">در این بازه پیام‌های عادی ارسال نمی‌شوند و تا پایان ساعات سکوت به تعویق می‌افتند.</p><div class="times"><label>شروع<input type="time" name="quiet_start" value="{{ prefs.quiet_start|time:'H:i' }}"></label><label>پایان<input type="time" name="quiet_end" value="{{ prefs.quiet_end|time:'H:i' }}"></label></div></section>
+    <button class="btn" type="submit">ذخیره تنظیمات</button>
+  </form>
+</main></body></html>
