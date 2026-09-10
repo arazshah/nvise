@@ -125,7 +125,7 @@ def _start_case_type_flow(*, state, provider, user, chat_id: str) -> bool:
     send_text(
         provider,
         chat_id,
-        "📁 نوع پرونده\n━━━━━━━━━━━━━━\nنوع این پرونده را انتخاب کنید تا Schema و Playbook مناسب برای تحلیل آن استفاده شود.",
+        "📁 نوع پرونده\n━━━━━━━━━━━━━━\nنوع این پرونده را انتخاب کنید تا نویسه روش تحلیل، پرسش‌های تخصصی و ساختار گزارش مناسب همین موضوع را به‌کار بگیرد.",
         _simple_choice_keyboard(list(mapping)),
     )
     return True
@@ -184,7 +184,7 @@ def _handle_professional_flow(*, state, provider, user, chat_id: str, text: str)
     send_text(
         provider,
         chat_id,
-        f"✅ نوع پرونده ثبت شد: {option.label}\n\nاز این پس تحلیل این پرونده با Schema و Playbook متناسب با حرفه و تخصص شما انجام می‌شود.",
+        f"✅ نوع پرونده ثبت شد: {option.label}\n\nاز این پس نویسه این پرونده را متناسب با حرفه، تخصص و موضوع آن بررسی می‌کند و پرسش‌ها و گزارش را بر همان اساس آماده می‌سازد.",
         active_case_keyboard(case),
     )
     return True
