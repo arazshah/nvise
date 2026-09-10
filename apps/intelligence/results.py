@@ -30,7 +30,10 @@ def analysis_result_summary(case: Case) -> dict:
     missing = issues.filter(issue_type=CaseFieldIssue.IssueType.MISSING).count()
     conflicts = issues.filter(issue_type=CaseFieldIssue.IssueType.CONFLICT).count()
     invalid = issues.filter(issue_type=CaseFieldIssue.IssueType.INVALID).count()
-    open_issues = missing + conflicts + invalid
+    expert_judgment = issues.filter(
+        issue_type=CaseFieldIssue.IssueType.EXPERT_JUDGMENT
+    ).count()
+    open_issues = missing + conflicts + invalid + expert_judgment
     quality = ledger_quality_summary(case)
 
     return {
@@ -39,6 +42,7 @@ def analysis_result_summary(case: Case) -> dict:
         "missing": missing,
         "conflicts": conflicts,
         "invalid": invalid,
+        "expert_judgment": expert_judgment,
         "has_issues": open_issues > 0,
         "sourced_facts": quality["sourced"],
         "high_confidence_facts": quality["high_confidence"],
@@ -91,6 +95,7 @@ def analysis_result_text(case: Case) -> str:
         f"🔗 یافته‌های متصل به مدرک: {summary['sourced_facts']}",
         f"🎯 یافته‌های با اطمینان بالا: {summary['high_confidence_facts']}",
         f"⚠️ موارد مبهم یا متناقض: {summary['conflicts'] + summary['invalid']}",
+        f"🧑‍⚖️ موارد نیازمند نظر تخصصی: {summary['expert_judgment']}",
         f"❓ موارد واقعاً پیدا نشده: {summary['missing']}",
     ]
     lines.extend(_render_fact_preview(case))
@@ -98,8 +103,8 @@ def analysis_result_text(case: Case) -> str:
         lines.extend(
             [
                 "",
-                f"در مجموع {summary['open_issues']} مورد نیاز به تصمیم یا بررسی شما دارد.",
-                "نویسه ابتدا مدارک و صوت‌های پرونده را بررسی کرده است؛ اگر هنوز موردی باز مانده، می‌توانید آن را رفع کنید، مدرک بیشتری اضافه کنید یا با اطلاعات فعلی ادامه دهید.",
+                f"در مجموع {summary['open_issues']} مورد هنوز به تصمیم یا بررسی شما نیاز دارد.",
+                "نویسه ابتدا همه شواهد پردازش‌شده را بررسی کرده است؛ موارد باقی‌مانده یا تعارض واقعی‌اند، یا اطلاعات ضروری واقعاً پیدا نشده، یا نیاز به قضاوت تخصصی شما دارند.",
             ]
         )
     else:
