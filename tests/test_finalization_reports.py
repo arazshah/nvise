@@ -8,6 +8,7 @@ from apps.cases.services import create_case, finish_input, transition_case
 from apps.intelligence.catalog import ensure_fire_loss_schema
 from apps.intelligence.followups import ensure_follow_up_questions, record_follow_up_answer
 from apps.intelligence.models import CaseFieldIssue, ExtractedFact, ExtractionRun, FollowUpQuestion
+from apps.intelligence.playbooks import resolve_playbook
 from apps.messaging.models import ConversationState, InboundUpdate
 from apps.reports.models import Report
 from apps.reports.services import approve_report, generate_report_revision
@@ -29,11 +30,7 @@ def test_follow_up_answer_is_linked_to_issue_evidence():
     case = transition_case(case=case, target_status=Case.Status.NEEDS_INFORMATION, actor=user)
     schema = ensure_fire_loss_schema()
     field = schema.fields.get(key="incident_address")
-    issue = CaseFieldIssue.objects.create(
-        case=case,
-        field=field,
-        issue_type=CaseFieldIssue.IssueType.MISSING,
-    )
+    issue = CaseFieldIssue.objects.create(case=case, field=field, issue_type=CaseFieldIssue.IssueType.MISSING)
     question = ensure_follow_up_questions(case)[0]
     state = ConversationState.objects.create(
         user=user,
@@ -43,12 +40,7 @@ def test_follow_up_answer_is_linked_to_issue_evidence():
         state="awaiting_followup",
         pending_action={"follow_up_question_id": str(question.id)},
     )
-    inbound = InboundUpdate.objects.create(
-        provider="bale",
-        bot_id="primary",
-        external_update_id="followup-1",
-        payload={},
-    )
+    inbound = InboundUpdate.objects.create(provider="bale", bot_id="primary", external_update_id="followup-1", payload={})
     message = SimpleNamespace(
         provider="bale",
         external_chat_id="chat-1",
@@ -59,12 +51,7 @@ def test_follow_up_answer_is_linked_to_issue_evidence():
         sent_at=None,
     )
 
-    answered = record_follow_up_answer(
-        state=state,
-        inbound=inbound,
-        user=user,
-        message=message,
-    )
+    answered = record_follow_up_answer(state=state, inbound=inbound, user=user, message=message)
 
     issue.refresh_from_db()
     answered.refresh_from_db()
@@ -80,12 +67,7 @@ def test_follow_up_answer_is_linked_to_issue_evidence():
 def test_report_revision_and_approval_transition_case():
     user, case = _case_fixture()
     schema = ensure_fire_loss_schema()
-    run = ExtractionRun.objects.create(
-        case=case,
-        schema=schema,
-        provider="test",
-        status=ExtractionRun.Status.COMPLETED,
-    )
+    run = ExtractionRun.objects.create(case=case, schema=schema, provider="test", status=ExtractionRun.Status.COMPLETED)
     field = schema.fields.get(key="insured_name")
     ExtractedFact.objects.create(
         case=case,
@@ -99,10 +81,12 @@ def test_report_revision_and_approval_transition_case():
     case = transition_case(case=case, target_status=Case.Status.READY_FOR_REVIEW, actor=user)
 
     revision = generate_report_revision(case=case, created_by=user)
+    playbook = resolve_playbook(case)
     assert revision.revision_number == 1
-    assert revision.sections.count() == 5
-    assert revision.sections.filter(key="limitations").exists()
+    assert revision.sections.count() == len(playbook.report_sections)
+    assert list(revision.sections.order_by("sequence").values_list("title", flat=True)) == list(playbook.report_sections)
     assert revision.structured_data["facts"]["insured_name"]["value"] == "آراز شاهکرمی"
+    assert revision.source_snapshot["playbook"] == playbook.key
 
     report = approve_report(case=case, user=user)
     case.refresh_from_db()
