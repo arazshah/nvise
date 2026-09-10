@@ -9,6 +9,7 @@ urlpatterns = [
     path("access/portal/<str:token>/", views.portal_access, name="portal-access"),
     path("access/<str:token>/", views.review_access, name="access"),
     path("dashboard/", views.dashboard, name="dashboard"),
+    path("today/", views.today_view, name="today"),
     path("profile/", profile_views.professional_profile, name="professional-profile"),
     path("reminders/", profile_views.reminder_preferences, name="reminder-preferences"),
     path("billing/", billing_views.billing_overview, name="billing"),
