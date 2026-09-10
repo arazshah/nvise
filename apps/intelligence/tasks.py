@@ -117,11 +117,19 @@ def extract_case_facts(self, run_id: str) -> None:
                 metadata={"provider": provider.key, "model": run.model_name},
             )
 
+        refreshed_case = Case.objects.get(pk=run.case_id)
         has_open_issues = CaseFieldIssue.objects.filter(
-            case=run.case,
+            case=refreshed_case,
             status=CaseFieldIssue.Status.OPEN,
         ).exists()
-        refreshed_case = Case.objects.get(pk=run.case_id)
+
+        if has_open_issues:
+            ensure_follow_up_questions(refreshed_case)
+            has_open_issues = CaseFieldIssue.objects.filter(
+                case=refreshed_case,
+                status=CaseFieldIssue.Status.OPEN,
+            ).exists()
+
         refreshed_case.analysis_status = (
             Case.AnalysisStatus.NEEDS_REVIEW if has_open_issues else Case.AnalysisStatus.COMPLETED
         )
@@ -130,9 +138,6 @@ def extract_case_facts(self, run_id: str) -> None:
         if refreshed_case.status == Case.Status.FINALIZING:
             target = Case.Status.NEEDS_INFORMATION if has_open_issues else Case.Status.OPEN
             refreshed_case = transition_case(case=refreshed_case, target_status=target)
-
-        if has_open_issues:
-            ensure_follow_up_questions(refreshed_case)
 
         transaction.on_commit(lambda: notify_analysis_result.delay(str(refreshed_case.id)))
     except Exception as exc:
