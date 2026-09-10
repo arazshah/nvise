@@ -9,7 +9,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from apps.cases.actions import complete_case_action, create_manual_action, next_best_action, open_case_actions
+from apps.cases.actions import complete_case_action, create_manual_action, next_best_action, open_case_actions, sync_system_actions
 from apps.cases.models import Case, CaseAction
 from apps.cases.services import CaseTransitionError, archive_case, reopen_case
 from apps.documents.models import GeneratedDocument
@@ -449,3 +449,56 @@ def complete_case_action_view(request, case_code: str, action_id):
     except (CaseAction.DoesNotExist, ValueError):
         return HttpResponseBadRequest("این اقدام قابل تکمیل نیست.")
     return redirect("portal:case-repository", case_code=case.case_code)
+
+
+@login_required
+@require_http_methods(["GET"])
+def today_view(request):
+    accessible = _accessible_cases(request.user).filter(lifecycle_status=Case.LifecycleStatus.ACTIVE)
+    for case in accessible[:200]:
+        sync_system_actions(case)
+
+    now = timezone.now()
+    local_today = timezone.localdate()
+    tomorrow = local_today + __import__("datetime").timedelta(days=1)
+    tomorrow_start = timezone.make_aware(
+        __import__("datetime").datetime.combine(tomorrow, __import__("datetime").time.min),
+        timezone.get_current_timezone(),
+    )
+    today_start = timezone.make_aware(
+        __import__("datetime").datetime.combine(local_today, __import__("datetime").time.min),
+        timezone.get_current_timezone(),
+    )
+    week_end = tomorrow_start + __import__("datetime").timedelta(days=7)
+
+    actions = CaseAction.objects.filter(
+        case__in=accessible,
+        status=CaseAction.Status.OPEN,
+    ).select_related("case").order_by("-priority", "due_at", "created_at")
+
+    overdue = list(actions.filter(due_at__lt=now))
+    today = list(actions.filter(due_at__gte=now, due_at__lt=tomorrow_start))
+    important = list(
+        actions.filter(
+            due_at__isnull=True,
+            priority__gte=CaseAction.Priority.HIGH,
+        )
+    )
+    upcoming = list(actions.filter(due_at__gte=tomorrow_start, due_at__lt=week_end))
+    unscheduled = list(
+        actions.filter(due_at__isnull=True, priority__lt=CaseAction.Priority.HIGH)[:20]
+    )
+
+    return render(
+        request,
+        "portal/today.html",
+        {
+            "overdue_actions": overdue,
+            "today_actions": today,
+            "important_actions": important,
+            "upcoming_actions": upcoming,
+            "unscheduled_actions": unscheduled,
+            "today_count": len(overdue) + len(today) + len(important),
+            "today_start": today_start,
+        },
+    )
