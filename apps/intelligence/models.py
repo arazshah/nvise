@@ -169,3 +169,59 @@ class FollowUpQuestion(models.Model):
     asked_at = models.DateTimeField(null=True, blank=True)
     answered_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class GoldenCase(models.Model):
+    """Human-curated benchmark definition for a real, anonymised case."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    key = models.SlugField(max_length=96, unique=True)
+    name = models.CharField(max_length=180)
+    case = models.OneToOneField(Case, on_delete=models.CASCADE, related_name="golden_case")
+    is_active = models.BooleanField(default=True, db_index=True)
+    expected_facts = models.JSONField(default=dict, blank=True)
+    no_followup_fact_keys = models.JSONField(default=list, blank=True)
+    minimum_grounding_ratio = models.FloatField(default=0.90)
+    minimum_fact_recall = models.FloatField(default=0.90)
+    maximum_redundant_question_rate = models.FloatField(default=0.05)
+    expert_report_score = models.FloatField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name
+
+
+class GoldenCaseEvaluation(models.Model):
+    class Status(models.TextChoices):
+        PASSED = "passed", "Passed"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    golden_case = models.ForeignKey(GoldenCase, on_delete=models.CASCADE, related_name="evaluations")
+    extraction_run = models.ForeignKey(
+        ExtractionRun,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="golden_evaluations",
+    )
+    report_revision_id = models.UUIDField(null=True, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, db_index=True)
+    fact_recall = models.FloatField(default=0)
+    exact_fact_accuracy = models.FloatField(default=0)
+    redundant_question_rate = models.FloatField(default=0)
+    claim_grounding_ratio = models.FloatField(default=0)
+    report_quality_score = models.FloatField(null=True, blank=True)
+    overall_score = models.FloatField(default=0)
+    metrics = models.JSONField(default=dict, blank=True)
+    git_sha = models.CharField(max_length=64, blank=True)
+    model_name = models.CharField(max_length=128, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.golden_case.key}: {self.status} ({self.overall_score:.3f})"
