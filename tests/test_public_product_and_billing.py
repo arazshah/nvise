@@ -34,6 +34,8 @@ def test_public_home_and_guide_reflect_current_product_identity(client):
     assert "کارشناسان رسمی" in home_text
     assert "کارشناسان بیمه و ارزیابان خسارت" in home_text
     assert "۳۰ روز" in home_text
+    assert "مدارک و گفتارهای پرونده را می‌خواند" in home_text
+    assert "Professional Case Intelligence" not in home_text
     assert "/finish" not in home_text
 
     guide = client.get("/guide/")
@@ -42,6 +44,10 @@ def test_public_home_and_guide_reflect_current_product_identity(client):
     assert "راهنمای ساده استفاده از نویسه" in guide_text
     assert "🏠 منوی اصلی" in guide_text
     assert "💳 اشتراک و مصرف" in guide_text
+    assert "پروفایل حرفه‌ای" in guide_text
+    assert "کنترل ادعاها و داده‌ها" in guide_text
+    assert "Schema" not in guide_text
+    assert "Playbook" not in guide_text
     assert "sendInvoice" not in guide_text
     assert "pre_checkout_query" not in guide_text
     assert "Admin" not in guide_text
