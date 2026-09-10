@@ -95,6 +95,7 @@ class CaseAction(models.Model):
         REVIEW_REPORT = "review_report", "بررسی گزارش"
         REGENERATE_REPORT = "regenerate_report", "بازسازی گزارش"
         FOLLOW_UP = "follow_up", "پیگیری پرونده"
+        STALE_CASE = "stale_case", "پرونده بدون اقدام"
 
     class Status(models.TextChoices):
         OPEN = "open", "باز"
@@ -194,4 +195,29 @@ class CaseReminder(models.Model):
         ordering = ["remind_at", "created_at"]
         indexes = [
             models.Index(fields=["status", "remind_at"], name="case_reminder_due_idx")
+        ]
+
+
+class DigestDelivery(models.Model):
+    class DigestType(models.TextChoices):
+        DAILY = "daily", "خلاصه روزانه"
+        WEEKLY = "weekly", "خلاصه هفتگی"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="digest_deliveries",
+    )
+    digest_type = models.CharField(max_length=16, choices=DigestType.choices)
+    period_key = models.CharField(max_length=32)
+    item_count = models.PositiveIntegerField(default=0)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "digest_type", "period_key"],
+                name="uniq_user_digest_period",
+            )
         ]
