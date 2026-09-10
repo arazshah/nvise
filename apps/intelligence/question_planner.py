@@ -53,6 +53,17 @@ def _fact_sources(fact: ExtractedFact) -> tuple[str, ...]:
     return tuple(labels[:4])
 
 
+def _evidence_sources(case_id, evidence_ids: list[str]) -> tuple[str, ...]:
+    if not evidence_ids:
+        return ()
+    labels: list[str] = []
+    for evidence in Evidence.objects.filter(case_id=case_id, id__in=evidence_ids):
+        label = _source_label(evidence)
+        if label not in labels:
+            labels.append(label)
+    return tuple(labels[:4])
+
+
 def _latest_field_facts(issue: CaseFieldIssue) -> list[ExtractedFact]:
     latest_run = issue.case.extraction_runs.filter(status="completed").order_by(
         "-completed_at", "-created_at"
@@ -85,8 +96,6 @@ def plan_question(issue: CaseFieldIssue) -> PlannedQuestion:
     label = issue.field.label
     details = issue.details or {}
 
-    # A missing issue with a usable fact is stale. Never ask the user for information
-    # that the current evidence ledger already contains.
     usable = [fact for fact in facts if fact.status != ExtractedFact.Status.CONFLICTED]
     if issue.issue_type == CaseFieldIssue.IssueType.MISSING and usable:
         best = usable[0]
@@ -140,6 +149,23 @@ def plan_question(issue: CaseFieldIssue) -> PlannedQuestion:
             explanation=explanation,
             prompt=f"لطفاً مقدار صحیح «{label}» را تأیید یا اصلاح کنید.",
             candidates=(current,) if current else (),
+        )
+
+    if issue.issue_type == CaseFieldIssue.IssueType.EXPERT_JUDGMENT:
+        rationale = str(details.get("rationale") or "").strip()
+        prompt = str(details.get("prompt") or "").strip()
+        sources = _evidence_sources(issue.case_id, details.get("evidence_ids") or [])
+        importance = str(details.get("importance") or "medium").lower()
+        importance_label = "بالا" if importance == "high" else "متوسط"
+        explanation = rationale or "شواهد موجود برای تصمیم قطعی کافی نیست و نظر تخصصی شما لازم است."
+        explanation = f"{explanation}\nاهمیت تصمیم: {importance_label}"
+        return PlannedQuestion(
+            category="expert_judgment",
+            should_ask=True,
+            title="نیازمند نظر تخصصی",
+            explanation=explanation,
+            prompt=prompt or f"نظر تخصصی شما درباره «{label}» چیست؟",
+            sources=sources,
         )
 
     if issue.issue_type == CaseFieldIssue.IssueType.MISSING:
