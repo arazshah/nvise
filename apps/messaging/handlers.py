@@ -1,9 +1,12 @@
 from asgiref.sync import async_to_sync
 from django.db import transaction
+from django.utils import timezone
+from datetime import timedelta
 
-from apps.cases.actions import next_best_action
-from apps.cases.models import Case
+from apps.cases.actions import complete_case_action, next_best_action
+from apps.cases.models import Case, CaseAction
 from apps.cases.presentation import case_status_description, case_status_label
+from apps.cases.reminders import snooze_action
 from apps.cases.services import (
     CaseTransitionError,
     archive_case,
@@ -44,6 +47,8 @@ ARCHIVE_COMMANDS = {"📦 بایگانی پرونده"}
 CHANGE_CASE_COMMANDS = {"🔄 تغییر پرونده"}
 PROFILE_COMMANDS = {"👤 پروفایل حرفه‌ای", "پروفایل حرفه‌ای"}
 NEXT_ACTION_COMMANDS = {"📌 اقدام بعدی", "اقدام بعدی"}
+REMINDER_DONE_COMMANDS = {"✅ انجام شد"}
+REMINDER_SNOOZE_COMMANDS = {"⏰ فردا یادآوری کن"}
 BACK_TO_MENU_COMMANDS = {"↩️ بازگشت به منوی اصلی", "🏠 منوی اصلی"}
 
 
@@ -190,6 +195,47 @@ def _handle_professional_flow(*, state, provider, user, chat_id: str, text: str)
         f"✅ نوع پرونده ثبت شد: {option.label}\n\nاز این پس نویسه این پرونده را متناسب با حرفه، تخصص و موضوع آن بررسی می‌کند و پرسش‌ها و گزارش را بر همان اساس آماده می‌سازد.",
         active_case_keyboard(case),
     )
+    return True
+
+
+
+def _handle_reminder_action(*, state, provider, user, chat_id: str, text: str) -> bool:
+    action_id = (state.pending_action or {}).get("reminder_action_id")
+    if not action_id or text not in REMINDER_DONE_COMMANDS | REMINDER_SNOOZE_COMMANDS:
+        return False
+    action = CaseAction.objects.filter(
+        pk=action_id,
+        case__tenant__memberships__user=user,
+        case__tenant__memberships__is_active=True,
+    ).distinct().first()
+    if action is None:
+        pending = dict(state.pending_action or {})
+        pending.pop("reminder_action_id", None)
+        state.pending_action = pending
+        state.save(update_fields=["pending_action", "updated_at"])
+        send_text(provider, chat_id, "این یادآوری دیگر فعال نیست.")
+        return True
+
+    if text in REMINDER_DONE_COMMANDS:
+        if action.system_key:
+            send_text(
+                provider,
+                chat_id,
+                "این اقدام با انجام مرحله مربوط به پرونده بسته می‌شود. پرونده را باز کنید و همان مرحله را انجام دهید.",
+                active_case_keyboard(action.case),
+            )
+        else:
+            complete_case_action(case=action.case, action_id=action.id, user=user)
+            send_text(provider, chat_id, f"✅ «{action.title}» انجام‌شده ثبت شد.", active_case_keyboard(action.case))
+    else:
+        snooze_action(action=action, user=user, until=timezone.now() + timedelta(days=1))
+        send_text(provider, chat_id, f"⏰ یادآوری «{action.title}» برای فردا تنظیم شد.", active_case_keyboard(action.case))
+
+    state.active_case = action.case
+    pending = dict(state.pending_action or {})
+    pending.pop("reminder_action_id", None)
+    state.pending_action = pending
+    state.save(update_fields=["active_case", "pending_action", "updated_at"])
     return True
 
 
@@ -384,6 +430,9 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
         state.pending_action = {}
         state.save(update_fields=["active_case", "state", "pending_action", "updated_at"])
         send_text(provider, message.external_chat_id, "🏠 منوی اصلی\n\nپرونده قبلی بسته یا حذف نشده است؛ فقط از آن خارج شدید.", main_menu_keyboard())
+        return
+
+    if _handle_reminder_action(state=state, provider=provider, user=user, chat_id=message.external_chat_id, text=text):
         return
 
     if _handle_professional_flow(state=state, provider=provider, user=user, chat_id=message.external_chat_id, text=text):
