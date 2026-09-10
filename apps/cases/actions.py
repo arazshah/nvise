@@ -79,39 +79,38 @@ def _wanted_system_keys(case: Case) -> list[str]:
     if case.lifecycle_status != Case.LifecycleStatus.ACTIVE:
         return []
 
-    if case.report_status == Case.ReportStatus.DRAFT and hasattr(case, "report") and case.report.current_revision_id:
-        return ["report:regenerate"]
+    wanted: list[str] = []
 
-    if case.report_status == Case.ReportStatus.READY_FOR_REVIEW:
-        return ["report:review"]
-
-    if case.analysis_status == Case.AnalysisStatus.FAILED:
-        return ["analysis:retry"]
-
-    if case.analysis_status == Case.AnalysisStatus.NEEDS_REVIEW:
-        return ["analysis:review"]
-
-    if case.analysis_status == Case.AnalysisStatus.COMPLETED:
+    if (
+        case.report_status == Case.ReportStatus.DRAFT
+        and hasattr(case, "report")
+        and case.report.current_revision_id
+    ):
+        wanted.append("report:regenerate")
+    elif case.report_status == Case.ReportStatus.READY_FOR_REVIEW:
+        wanted.append("report:review")
+    elif case.analysis_status == Case.AnalysisStatus.FAILED:
+        wanted.append("analysis:retry")
+    elif case.analysis_status == Case.AnalysisStatus.NEEDS_REVIEW:
+        wanted.append("analysis:review")
+    elif case.analysis_status == Case.AnalysisStatus.COMPLETED:
         has_open_issues = CaseFieldIssue.objects.filter(
             case=case,
             status=CaseFieldIssue.Status.OPEN,
         ).exists()
         if not has_open_issues and case.report_status == Case.ReportStatus.NOT_CREATED:
-            return ["report:generate"]
-        return []
-
-    if case.analysis_status == Case.AnalysisStatus.NOT_STARTED and case.messages.exists():
-        return ["analysis:start"]
+            wanted.append("report:generate")
+    elif case.analysis_status == Case.AnalysisStatus.NOT_STARTED and case.messages.exists():
+        wanted.append("analysis:start")
 
     if (
         case.report_status != Case.ReportStatus.APPROVED
         and case.messages.exists()
         and case.updated_at <= timezone.now() - timedelta(days=7)
     ):
-        return ["case:stale"]
+        wanted.append("case:stale")
 
-    return []
-
+    return wanted
 
 @transaction.atomic
 def sync_system_actions(case: Case) -> list[CaseAction]:
