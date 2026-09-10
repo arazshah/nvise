@@ -10,8 +10,13 @@ from apps.intelligence.followups import ensure_follow_up_questions, record_follo
 from apps.intelligence.models import CaseFieldIssue, ExtractedFact, ExtractionRun, FollowUpQuestion
 from apps.intelligence.playbooks import resolve_playbook
 from apps.messaging.models import ConversationState, InboundUpdate
-from apps.reports.models import Report, ReportSectionReview
-from apps.reports.services import approve_report, generate_report_revision, save_section_review
+from apps.reports.models import Report, ReportClaimReview, ReportSectionReview
+from apps.reports.services import (
+    approve_report,
+    generate_report_revision,
+    save_claim_review,
+    save_section_review,
+)
 from apps.tenants.models import Tenant, TenantMembership
 
 
@@ -88,7 +93,7 @@ def test_report_revision_and_approval_transition_case():
     assert revision.structured_data["facts"]["insured_name"]["value"] == "آراز شاهکرمی"
     assert revision.source_snapshot["playbook"] == playbook.key
 
-    with pytest.raises(ValueError, match="All sections"):
+    with pytest.raises(ValueError, match="sections and material claims"):
         approve_report(case=case, user=user)
 
     for section in revision.sections.all():
@@ -98,6 +103,13 @@ def test_report_revision_and_approval_transition_case():
             section_id=section.id,
             decision=ReportSectionReview.Decision.ACCEPTED,
         )
+    for claim in revision.claims.all():
+        save_claim_review(
+            case=case,
+            user=user,
+            claim_id=claim.id,
+            decision=ReportClaimReview.Decision.ACCEPTED,
+        )
 
     report = approve_report(case=case, user=user)
     case.refresh_from_db()
@@ -105,3 +117,4 @@ def test_report_revision_and_approval_transition_case():
     assert case.status == Case.Status.APPROVED
     assert report.approvals.count() == 1
     assert revision.section_reviews.filter(reviewer=user).count() == revision.sections.count()
+    assert revision.claims.filter(reviews__reviewer=user, reviews__decision="accepted").count() == revision.claims.count()
