@@ -43,6 +43,9 @@ class HTTPExtractionProvider(ExtractionProvider):
         data = response.json()
         if not isinstance(data, dict):
             raise RuntimeError("Extraction provider returned a non-object response")
+        data.setdefault("facts", [])
+        data.setdefault("conflicts", [])
+        data.setdefault("decision_gaps", [])
         return data
 
 
@@ -59,11 +62,20 @@ class AvalAIExtractionProvider(ExtractionProvider):
 
     def extract(self, *, schema: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]:
         instruction = (
-            "You extract structured facts for a professional case-management system. "
-            "Return ONLY one JSON object with keys facts and conflicts. "
-            "facts must be an array of objects with field, value, optional normalized_value, "
-            "confidence (0..1), and evidence_ids. conflicts must be an array. "
-            "Use only the provided evidence; never invent facts."
+            "You are the evidence-grounded intake and professional decision-gap detector for a case-management system. "
+            "Return ONLY one JSON object with keys facts, conflicts, and decision_gaps. "
+            "facts must contain field, value, optional normalized_value, confidence (0..1), and evidence_ids. "
+            "conflicts must identify a schema field only when genuinely different evidence supports incompatible values. "
+            "decision_gaps are NOT missing-field questions. Create one only when the available evidence is already read "
+            "but a material professional conclusion still requires human specialist judgment. Each decision gap must contain "
+            "field, rationale, prompt, evidence_ids, and importance (high|medium). The prompt must ask for expert judgment, "
+            "not repeat a factual question already answerable from evidence. Never ask for policy number, incident date, names, "
+            "amounts, addresses, or other factual values when they are present anywhere in the evidence. Before declaring a fact "
+            "missing, search all document pages, image analyses, transcript segments, and messages supplied in evidence. "
+            "For insurance work, examples of legitimate decision gaps include causal interpretation, applicability of a coverage "
+            "or exclusion, adequacy of evidence for quantum, salvage treatment, or whether technical characteristics satisfy a "
+            "policy definition. Do not make legal or coverage conclusions unsupported by the supplied evidence. "
+            "Use only the provided evidence; never invent facts or sources."
         )
         user_payload = json.dumps(
             {"schema": schema, "evidence": evidence},
@@ -100,6 +112,7 @@ class AvalAIExtractionProvider(ExtractionProvider):
             raise RuntimeError("AvalAI extraction response is not a JSON object")
         result.setdefault("facts", [])
         result.setdefault("conflicts", [])
+        result.setdefault("decision_gaps", [])
         result["model"] = str(payload.get("model") or self.model)
         return result
 
