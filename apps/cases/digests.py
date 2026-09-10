@@ -95,7 +95,12 @@ def weekly_digest_text(user) -> tuple[str, int]:
         tenant__memberships__is_active=True,
         report_status=Case.ReportStatus.READY_FOR_REVIEW,
     ).distinct().count()
-    stale_count = actions.filter(action_type=CaseAction.ActionType.STALE_CASE).count()
+    prefs = get_preferences(user)
+    stale_count = (
+        actions.filter(action_type=CaseAction.ActionType.STALE_CASE).count()
+        if prefs.stale_case_enabled
+        else 0
+    )
     if not any([open_count, overdue_count, report_count, stale_count]):
         return "", 0
     lines = [
