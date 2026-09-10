@@ -20,12 +20,14 @@ def _fallback_sections(*, playbook, facts: dict[str, Any], limitations: list[dic
         key = f"section_{index + 1}"
         if "محدودیت" in title:
             if limitations:
-                content = "\n".join(
+                detail = "\n".join(
                     f"- {item['field_label']}: {item['issue_type_label']}؛ {item['resolution_label']}"
+                    + (f"؛ {item['resolution_note']}" if item.get("resolution_note") else "")
                     for item in limitations
                 )
+                content = "محدودیت‌ها و موارد نامشخص این نسخه:\n" + detail
             else:
-                content = "در زمان تهیه این نسخه، محدودیت ثبت‌شده‌ای باقی نمانده است."
+                content = "در زمان تهیه این نسخه، محدودیت یا مورد نامشخص ثبت‌شده‌ای باقی نمانده است."
         else:
             content = base
         sections.append({"key": key, "title": title, "content": content})
@@ -34,9 +36,12 @@ def _fallback_sections(*, playbook, facts: dict[str, Any], limitations: list[dic
 
 def fallback_report(*, case, facts: dict[str, Any], limitations: list[dict[str, Any]]) -> dict[str, Any]:
     playbook = resolve_playbook(case)
+    summary = "پیش‌نویس گزارش بر پایه اطلاعات استخراج‌شده و شواهد قابل ردیابی پرونده تهیه شده است."
+    if limitations:
+        summary += f" این نسخه با {len(limitations)} مورد اطلاعات نامشخص یا محدودیت ثبت‌شده تهیه شده است."
     return {
         "title": f"{playbook.title} - {case.title or case.case_code}",
-        "summary": "پیش‌نویس گزارش بر پایه اطلاعات استخراج‌شده و شواهد قابل ردیابی پرونده تهیه شده است.",
+        "summary": summary,
         "sections": _fallback_sections(playbook=playbook, facts=facts, limitations=limitations),
         "composer": "fallback",
     }
@@ -74,7 +79,8 @@ def compose_professional_report(*, case, facts: dict[str, Any], limitations: lis
         "Distinguish direct facts from interpretations. When evidence is insufficient, use cautious language such as 'بر اساس "
         "مدارک موجود' or explicitly state that a definitive conclusion is not possible. Never present an unsupported legal, "
         "coverage, liability, root-cause, or financial conclusion as certain. The report must be coherent narrative prose, not "
-        "a label:value dump. Preserve material limitations. Each section object must contain key, title, content."
+        "a label:value dump. Preserve every material limitation and mention the limitation count in the summary when limitations "
+        "exist. Each section object must contain key, title, content."
     )
     try:
         response = httpx.post(
@@ -103,9 +109,12 @@ def compose_professional_report(*, case, facts: dict[str, Any], limitations: lis
                 raise ValueError("Invalid report section key")
             text = str(section.get("content") or "").strip()
             normalized.append({"key": expected["key"], "title": expected["title"], "content": text})
+        summary = str(result.get("summary") or "").strip()
+        if limitations and f"{len(limitations)}" not in summary:
+            summary += f" این نسخه با {len(limitations)} مورد اطلاعات نامشخص یا محدودیت ثبت‌شده تهیه شده است."
         return {
             "title": str(result.get("title") or f"{playbook.title} - {case.title or case.case_code}").strip(),
-            "summary": str(result.get("summary") or "").strip(),
+            "summary": summary,
             "sections": normalized,
             "composer": "avalai",
             "model": str(raw.get("model") or config.text_model),
