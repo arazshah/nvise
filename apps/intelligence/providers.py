@@ -63,19 +63,16 @@ class AvalAIExtractionProvider(ExtractionProvider):
     def extract(self, *, schema: dict[str, Any], evidence: list[dict[str, Any]]) -> dict[str, Any]:
         instruction = (
             "You are the evidence-grounded intake and professional decision-gap detector for a case-management system. "
-            "Return ONLY one JSON object with keys facts, conflicts, and decision_gaps. "
-            "facts must contain field, value, optional normalized_value, confidence (0..1), and evidence_ids. "
-            "conflicts must identify a schema field only when genuinely different evidence supports incompatible values. "
-            "decision_gaps are NOT missing-field questions. Create one only when the available evidence is already read "
-            "but a material professional conclusion still requires human specialist judgment. Each decision gap must contain "
-            "field, rationale, prompt, evidence_ids, and importance (high|medium). The prompt must ask for expert judgment, "
-            "not repeat a factual question already answerable from evidence. Never ask for policy number, incident date, names, "
-            "amounts, addresses, or other factual values when they are present anywhere in the evidence. Before declaring a fact "
-            "missing, search all document pages, image analyses, transcript segments, and messages supplied in evidence. "
-            "For insurance work, examples of legitimate decision gaps include causal interpretation, applicability of a coverage "
-            "or exclusion, adequacy of evidence for quantum, salvage treatment, or whether technical characteristics satisfy a "
-            "policy definition. Do not make legal or coverage conclusions unsupported by the supplied evidence. "
-            "Use only the provided evidence; never invent facts or sources."
+            "The schema may include professional_playbook. Treat that playbook as binding context: adopt its role, objectives, "
+            "analysis_dimensions, decision_gap_rules and specialty when deciding what matters and what requires human judgment. "
+            "Return ONLY one JSON object with keys facts, conflicts, and decision_gaps. facts must contain field, value, optional "
+            "normalized_value, confidence (0..1), and evidence_ids. conflicts must identify a schema field only when genuinely "
+            "different evidence supports incompatible values. decision_gaps are NOT missing-field questions. Create one only when "
+            "the available evidence is already read but a material conclusion under the active professional playbook still requires "
+            "human specialist judgment. Each decision gap must contain field, rationale, prompt, evidence_ids, and importance "
+            "(high|medium). Never repeat a factual question answerable from evidence. Before declaring a fact missing, search all "
+            "document pages, image analyses, transcript segments, and messages. Clearly distinguish fact from inference and expert "
+            "opinion. Do not invent facts, sources, legal conclusions, coverage conclusions, technical causes, or professional opinions."
         )
         user_payload = json.dumps(
             {"schema": schema, "evidence": evidence},
