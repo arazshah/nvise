@@ -18,6 +18,13 @@ def _case(*, profession, specialty=""):
     return case
 
 
+def _enable_avalai():
+    settings, _ = IntegrationSettings.objects.get_or_create(pk=1)
+    settings.avalai_enabled = True
+    settings.avalai_api_key = "test-key"
+    settings.save()
+
+
 @pytest.mark.django_db
 def test_fallback_uses_professional_playbook_sections():
     case = _case(profession=User.Profession.LAWYER, specialty="contracts")
@@ -34,10 +41,7 @@ def test_fallback_uses_professional_playbook_sections():
 @pytest.mark.django_db
 def test_composer_accepts_only_playbook_section_keys(monkeypatch):
     case = _case(profession=User.Profession.INSURANCE_LOSS_ADJUSTER, specialty="property_fire")
-    settings = IntegrationSettings.get_solo()
-    settings.avalai_enabled = True
-    settings.avalai_api_key = "test-key"
-    settings.save()
+    _enable_avalai()
     playbook = resolve_playbook(case)
 
     class Response:
@@ -67,10 +71,7 @@ def test_composer_accepts_only_playbook_section_keys(monkeypatch):
 @pytest.mark.django_db
 def test_invalid_ai_structure_falls_back_safely(monkeypatch):
     case = _case(profession=User.Profession.TECHNICAL_EXPERT, specialty="industrial")
-    settings = IntegrationSettings.get_solo()
-    settings.avalai_enabled = True
-    settings.avalai_api_key = "test-key"
-    settings.save()
+    _enable_avalai()
 
     class Response:
         headers = {}
