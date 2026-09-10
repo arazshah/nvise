@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from celery.schedules import crontab
+
 import environ
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -140,6 +142,14 @@ CELERY_BEAT_SCHEDULE = {
     "dispatch-case-reminders": {
         "task": "apps.cases.tasks.dispatch_due_reminders",
         "schedule": 300.0,
+    },
+    "daily-case-digest": {
+        "task": "apps.cases.tasks.send_daily_case_digest",
+        "schedule": crontab(hour=8, minute=0),
+    },
+    "weekly-case-digest": {
+        "task": "apps.cases.tasks.send_weekly_case_digest",
+        "schedule": crontab(hour=8, minute=15, day_of_week="thu"),
     },
 }
 
