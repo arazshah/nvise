@@ -77,9 +77,10 @@ def test_section_review_snapshots_only_case_evidence_and_unlocks_progress(client
     assert response.status_code == 200
     body = response.content.decode("utf-8")
     assert "Fact Ledger" in body
-    assert "Confidence: 0.97" in body
+    assert "اطمینان 0.97" in body
     assert f"#evidence-{evidence.id}" in body
-    assert "تصمیم کارشناسی برای هر بخش" in body
+    assert "تصمیم برای هر بخش" in body
+    assert "کنترل ادعاها و Factها" in body
 
 
 @pytest.mark.django_db
