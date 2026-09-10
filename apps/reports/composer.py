@@ -12,20 +12,30 @@ from apps.system.integrations import get_avalai_config
 logger = logging.getLogger(__name__)
 
 
+def _section_key(title: str, index: int) -> str:
+    if "محدودیت" in title:
+        return "limitations"
+    return f"section_{index + 1}"
+
+
 def _fallback_sections(*, playbook, facts: dict[str, Any], limitations: list[dict[str, Any]]) -> list[dict[str, str]]:
     fact_lines = [f"{item['label']}: {item['value']}" for item in facts.values()]
     base = "\n".join(fact_lines) or "اطلاعات قابل اتکای کافی برای این بخش در پرونده ثبت نشده است."
     sections = []
     for index, title in enumerate(playbook.report_sections):
-        key = f"section_{index + 1}"
-        if "محدودیت" in title:
+        key = _section_key(title, index)
+        if key == "limitations":
             if limitations:
                 detail = "\n".join(
                     f"- {item['field_label']}: {item['issue_type_label']}؛ {item['resolution_label']}"
                     + (f"؛ {item['resolution_note']}" if item.get("resolution_note") else "")
                     for item in limitations
                 )
-                content = "محدودیت‌ها و موارد نامشخص این نسخه:\n" + detail
+                content = (
+                    "این گزارش با وجود موارد زیر و بر اساس اطلاعات موجود تهیه شده است. "
+                    "محدودیت‌ها و موارد نامشخص باید هنگام تفسیر نتیجه گزارش در نظر گرفته شوند:\n"
+                    + detail
+                )
             else:
                 content = "در زمان تهیه این نسخه، محدودیت یا مورد نامشخص ثبت‌شده‌ای باقی نمانده است."
         else:
@@ -55,7 +65,7 @@ def compose_professional_report(*, case, facts: dict[str, Any], limitations: lis
     playbook = resolve_playbook(case)
     playbook_payload = serialize_playbook(case)
     allowed_sections = [
-        {"key": f"section_{index + 1}", "title": title}
+        {"key": _section_key(title, index), "title": title}
         for index, title in enumerate(playbook.report_sections)
     ]
     payload = {
