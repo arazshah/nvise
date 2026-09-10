@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import analysis_views, billing_views, profile_views, views
+from . import analysis_views, billing_views, grounding_views, profile_views, views
 
 app_name = "portal"
 
@@ -31,6 +31,26 @@ urlpatterns = [
         "cases/<str:case_code>/review/sections/<uuid:section_id>/",
         views.review_section,
         name="review-section",
+    ),
+    path(
+        "cases/<str:case_code>/review/grounding/",
+        grounding_views.grounding_overview,
+        name="grounding-overview",
+    ),
+    path(
+        "cases/<str:case_code>/review/facts/<uuid:fact_id>/",
+        grounding_views.fact_decision,
+        name="fact-decision",
+    ),
+    path(
+        "cases/<str:case_code>/review/claims/<uuid:claim_id>/",
+        grounding_views.claim_decision,
+        name="claim-decision",
+    ),
+    path(
+        "cases/<str:case_code>/review/regenerate/",
+        grounding_views.regenerate_grounded_report,
+        name="regenerate-grounded-report",
     ),
     path("cases/<str:case_code>/archive/", views.archive_case_view, name="archive-case"),
     path("cases/<str:case_code>/reopen/", views.reopen_case_view, name="reopen-case"),
