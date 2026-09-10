@@ -100,11 +100,10 @@ def _wanted_system_keys(case: Case) -> list[str]:
 
 @transaction.atomic
 def sync_system_actions(case: Case) -> list[CaseAction]:
-    locked_case = (
-        Case.objects.select_for_update()
-        .select_related("report__current_revision")
-        .get(pk=case.pk)
-    )
+    # Lock only the Case row. The reverse report relation is optional and
+    # selecting it here would make PostgreSQL apply FOR UPDATE to a nullable
+    # outer join.
+    locked_case = Case.objects.select_for_update().get(pk=case.pk)
     wanted = _wanted_system_keys(locked_case)
     existing = {
         row.system_key: row
