@@ -2,11 +2,12 @@ from django.db import transaction
 
 from apps.audit.services import record_audit_event
 from apps.cases.models import Case, CaseEvent
+from apps.evidence.models import Evidence
 from apps.intelligence.models import CaseFieldIssue, ExtractedFact
 from apps.intelligence.playbooks import resolve_playbook
 
 from .composer import compose_professional_report
-from .models import Report, ReportApproval, ReportRevision, ReportSection
+from .models import Report, ReportApproval, ReportRevision, ReportSection, ReportSectionReview
 
 
 def _latest_fact_map(case: Case) -> dict:
@@ -253,11 +254,98 @@ def create_review_revision(*, case: Case, user, title: str, summary: str, sectio
 
 
 @transaction.atomic
+def save_section_review(*, case: Case, user, section_id, decision: str, note: str = "", evidence_ids=None) -> ReportSectionReview:
+    report = Report.objects.select_for_update().get(case=case)
+    if report.status != Report.Status.READY_FOR_REVIEW or report.current_revision_id is None:
+        raise ValueError("Report is not ready for expert review")
+    if decision not in ReportSectionReview.Decision.values:
+        raise ValueError("Invalid review decision")
+
+    section = ReportSection.objects.select_related("revision").get(
+        pk=section_id,
+        revision_id=report.current_revision_id,
+    )
+    requested_ids = [str(item) for item in (evidence_ids or []) if item]
+    evidence_rows = list(
+        Evidence.objects.filter(case=case, id__in=requested_ids)
+        .order_by("created_at")
+        .values("id", "source_kind", "start_ms", "end_ms", "metadata")
+    )
+    evidence_snapshot = [
+        {
+            "evidence_id": str(item["id"]),
+            "source_kind": item["source_kind"],
+            "start_ms": item["start_ms"],
+            "end_ms": item["end_ms"],
+            "filename": (item["metadata"] or {}).get("filename"),
+            "page": (item["metadata"] or {}).get("page"),
+        }
+        for item in evidence_rows
+    ]
+    review, _ = ReportSectionReview.objects.update_or_create(
+        revision=section.revision,
+        section=section,
+        reviewer=user,
+        defaults={
+            "decision": decision,
+            "note": note.strip(),
+            "evidence_snapshot": evidence_snapshot,
+        },
+    )
+    CaseEvent.objects.create(
+        case=case,
+        event_type="report.section_reviewed",
+        actor=user,
+        payload={
+            "revision": section.revision.revision_number,
+            "section_key": section.key,
+            "decision": decision,
+            "evidence_count": len(evidence_snapshot),
+        },
+    )
+    record_audit_event(
+        event_type="report.section_reviewed",
+        actor=user,
+        case=case,
+        object_type="report_section_review",
+        object_id=review.id,
+        metadata={
+            "revision": section.revision.revision_number,
+            "section_key": section.key,
+            "decision": decision,
+            "evidence_ids": [item["evidence_id"] for item in evidence_snapshot],
+        },
+    )
+    return review
+
+
+def review_progress(*, revision: ReportRevision, user) -> dict:
+    total = revision.sections.count()
+    reviews = revision.section_reviews.filter(reviewer=user)
+    accepted = reviews.filter(decision=ReportSectionReview.Decision.ACCEPTED).count()
+    needs_edit = reviews.filter(decision=ReportSectionReview.Decision.NEEDS_EDIT).count()
+    rejected = reviews.filter(decision=ReportSectionReview.Decision.REJECTED).count()
+    reviewed = reviews.count()
+    return {
+        "total": total,
+        "reviewed": reviewed,
+        "accepted": accepted,
+        "needs_edit": needs_edit,
+        "rejected": rejected,
+        "remaining": max(total - reviewed, 0),
+        "can_approve": total > 0 and accepted == total,
+    }
+
+
+@transaction.atomic
 def approve_report(*, case: Case, user, note: str = "") -> Report:
     report = Report.objects.select_for_update().get(case=case)
     if report.status != Report.Status.READY_FOR_REVIEW or report.current_revision_id is None:
         raise ValueError("Report is not ready for approval")
     revision = ReportRevision.objects.get(pk=report.current_revision_id)
+    progress = review_progress(revision=revision, user=user)
+    if not progress["can_approve"]:
+        raise ValueError("All sections must be explicitly accepted by the approving expert")
     approval = ReportApproval.objects.create(report=report, revision=revision, approved_by=user, note=note)
     report.status = Report.Status.APPROVED
     report.save(update_fields=["status", "updated_at"])
