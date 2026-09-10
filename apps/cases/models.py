@@ -88,6 +88,7 @@ class CaseEvent(models.Model):
 class CaseAction(models.Model):
     class ActionType(models.TextChoices):
         MANUAL = "manual", "اقدام دستی"
+        START_ANALYSIS = "start_analysis", "شروع تحلیل"
         REVIEW_ANALYSIS = "review_analysis", "بررسی تحلیل"
         RETRY_ANALYSIS = "retry_analysis", "بررسی تحلیل ناموفق"
         GENERATE_REPORT = "generate_report", "تولید گزارش"
