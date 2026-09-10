@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from apps.cases.models import Case
 from apps.cases.services import transition_case
-from apps.messaging.models import CaseMessage, ConversationState
+from apps.messaging.models import ConversationState
 from apps.messaging.providers.bale import BaleProvider
 from apps.processing.models import ProcessingJob
 from apps.subscriptions.models import UsageRecord
@@ -19,17 +19,18 @@ from .results import analysis_result_keyboard, analysis_result_text
 from .services import apply_extraction_response, collect_case_evidence, serialize_schema
 
 
-def _audio_pipeline_pending(case: Case) -> bool:
+CONTENT_JOB_TYPES = [
+    ProcessingJob.JobType.FETCH_ATTACHMENT,
+    ProcessingJob.JobType.TRANSCRIBE_AUDIO,
+    ProcessingJob.JobType.EXTRACT_DOCUMENT,
+    ProcessingJob.JobType.ANALYZE_IMAGE,
+]
+
+
+def _case_evidence_pipeline_pending(case: Case) -> bool:
     return ProcessingJob.objects.filter(
         attachment__message__case=case,
-        attachment__message__message_type__in=[
-            CaseMessage.MessageType.VOICE,
-            CaseMessage.MessageType.AUDIO,
-        ],
-        job_type__in=[
-            ProcessingJob.JobType.FETCH_ATTACHMENT,
-            ProcessingJob.JobType.TRANSCRIBE_AUDIO,
-        ],
+        job_type__in=CONTENT_JOB_TYPES,
         status__in=[ProcessingJob.Status.PENDING, ProcessingJob.Status.RUNNING],
     ).exists()
 
@@ -72,8 +73,8 @@ def extract_case_facts(self, run_id: str) -> None:
         )
         if run.status == ExtractionRun.Status.COMPLETED:
             return
-        if _audio_pipeline_pending(run.case):
-            raise RuntimeError("Audio evidence is still being processed")
+        if _case_evidence_pipeline_pending(run.case):
+            raise RuntimeError("Case evidence is still being processed")
         try:
             assert_quota(run.case.tenant, UsageRecord.Metric.AI_EXTRACTION, 1)
         except QuotaExceededError as exc:
@@ -126,7 +127,6 @@ def extract_case_facts(self, run_id: str) -> None:
         )
         refreshed_case.save(update_fields=["analysis_status", "updated_at"])
 
-        # Keep the legacy combined status usable while making analysis/report decisions explicit.
         if refreshed_case.status == Case.Status.FINALIZING:
             target = Case.Status.NEEDS_INFORMATION if has_open_issues else Case.Status.OPEN
             refreshed_case = transition_case(case=refreshed_case, target_status=target)
@@ -134,8 +134,6 @@ def extract_case_facts(self, run_id: str) -> None:
         if has_open_issues:
             ensure_follow_up_questions(refreshed_case)
 
-        # Do not start questions or generate a report automatically. The user first sees
-        # the analysis result and chooses the next action.
         transaction.on_commit(lambda: notify_analysis_result.delay(str(refreshed_case.id)))
     except Exception as exc:
         with transaction.atomic():
