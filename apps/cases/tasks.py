@@ -23,3 +23,19 @@ def dispatch_due_reminders() -> dict:
             mark_reminder_sent(reminder.id)
             sent += 1
     return {"claimed": len(claimed), "sent": sent, "failed": failed}
+
+
+@shared_task
+def send_daily_case_digest() -> dict:
+    from .digests import send_enabled_digests
+    from .models import DigestDelivery
+
+    return send_enabled_digests(DigestDelivery.DigestType.DAILY)
+
+
+@shared_task
+def send_weekly_case_digest() -> dict:
+    from .digests import send_enabled_digests
+    from .models import DigestDelivery
+
+    return send_enabled_digests(DigestDelivery.DigestType.WEEKLY)
