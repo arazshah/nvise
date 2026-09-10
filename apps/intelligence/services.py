@@ -100,6 +100,8 @@ def start_extraction(*, case: Case, schema: FieldSchema) -> ExtractionRun:
 
 
 def supplemental_questions(case: Case) -> list[str]:
+    from .question_planner import plan_question
+
     questions = []
     issues = (
         case.field_issues.filter(status=CaseFieldIssue.Status.OPEN)
@@ -107,12 +109,9 @@ def supplemental_questions(case: Case) -> list[str]:
         .order_by("field__sequence", "created_at")
     )
     for issue in issues:
-        if issue.issue_type == CaseFieldIssue.IssueType.MISSING:
-            questions.append(f"لطفاً «{issue.field.label}» را مشخص کنید.")
-        elif issue.issue_type == CaseFieldIssue.IssueType.CONFLICT:
-            questions.append(f"برای «{issue.field.label}» اطلاعات متناقض ثبت شده؛ لطفاً مقدار صحیح را تأیید کنید.")
-        else:
-            questions.append(f"لطفاً مقدار معتبر برای «{issue.field.label}» ارائه کنید.")
+        plan = plan_question(issue)
+        if plan.should_ask:
+            questions.append(plan.prompt)
     return questions
 
 
@@ -251,6 +250,37 @@ def apply_extraction_response(*, run: ExtractionRun, response: dict[str, Any]) -
         )
         ExtractedFact.objects.filter(case=run.case, field=field, extraction_run=run).update(
             status=ExtractedFact.Status.CONFLICTED
+        )
+
+    # A decision gap is deliberately different from a missing fact. The model may only
+    # propose it when the available evidence has already been read and a material
+    # professional conclusion still needs human specialist judgment.
+    for gap in response.get("decision_gaps", []):
+        if not isinstance(gap, dict):
+            continue
+        field = field_map.get(gap.get("field"))
+        prompt = str(gap.get("prompt") or "").strip()
+        rationale = str(gap.get("rationale") or "").strip()
+        if field is None or not prompt or not rationale:
+            continue
+        evidence_ids = [
+            str(evidence_id)
+            for evidence_id in gap.get("evidence_ids", [])
+            if str(evidence_id) in evidence_map
+        ]
+        _upsert_issue(
+            case=run.case,
+            field=field,
+            issue_type=CaseFieldIssue.IssueType.EXPERT_JUDGMENT,
+            details={
+                "reason": "professional_decision_gap",
+                "rationale": rationale[:2000],
+                "prompt": prompt[:2000],
+                "importance": str(gap.get("importance") or "medium")[:16],
+                "evidence_ids": evidence_ids,
+            },
+            generated_keys=generated_keys,
+            terminal_field_ids=terminal_field_ids,
         )
 
     # Open issues that disappeared after re-analysis are resolved instead of being deleted.
