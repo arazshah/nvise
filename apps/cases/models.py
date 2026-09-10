@@ -221,3 +221,48 @@ class DigestDelivery(models.Model):
                 name="uniq_user_digest_period",
             )
         ]
+
+
+class CaseActionSuggestion(models.Model):
+    class Status(models.TextChoices):
+        PROPOSED = "proposed", "پیشنهاد شده"
+        ACCEPTED = "accepted", "پذیرفته شده"
+        REJECTED = "rejected", "رد شده"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name="action_suggestions")
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    rationale = models.TextField(blank=True)
+    suggested_due_at = models.DateTimeField(null=True, blank=True)
+    source_evidence_ids = models.JSONField(default=list, blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+    fingerprint = models.CharField(max_length=64)
+    provider = models.CharField(max_length=32, blank=True)
+    model_name = models.CharField(max_length=128, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PROPOSED, db_index=True)
+    accepted_action = models.ForeignKey(
+        CaseAction,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="source_suggestions",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_action_suggestions",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["case", "fingerprint"],
+                name="uniq_case_action_suggestion_fingerprint",
+            )
+        ]
