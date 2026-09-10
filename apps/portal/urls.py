@@ -14,6 +14,8 @@ urlpatterns = [
     path("billing/checkout/<slug:plan_code>/", billing_views.start_bale_checkout, name="billing-checkout"),
     path("cases/", views.case_list, name="case-list"),
     path("cases/<str:case_code>/", views.case_repository, name="case-repository"),
+    path("cases/<str:case_code>/actions/create/", views.create_case_action_view, name="case-action-create"),
+    path("cases/<str:case_code>/actions/<uuid:action_id>/complete/", views.complete_case_action_view, name="case-action-complete"),
     path("cases/<str:case_code>/analysis/", analysis_views.analysis_overview, name="analysis-overview"),
     path("cases/<str:case_code>/analysis/start/", analysis_views.start_analysis_view, name="analysis-start"),
     path(
