@@ -69,6 +69,35 @@ class ReportSection(models.Model):
         ]
 
 
+class ReportSectionReview(models.Model):
+    class Decision(models.TextChoices):
+        ACCEPTED = "accepted", "Accepted"
+        NEEDS_EDIT = "needs_edit", "Needs edit"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    revision = models.ForeignKey(ReportRevision, on_delete=models.CASCADE, related_name="section_reviews")
+    section = models.ForeignKey(ReportSection, on_delete=models.CASCADE, related_name="reviews")
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="report_section_reviews",
+    )
+    decision = models.CharField(max_length=24, choices=Decision.choices, db_index=True)
+    note = models.TextField(blank=True)
+    evidence_snapshot = models.JSONField(default=list, blank=True)
+    reviewed_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["revision", "section", "reviewer"],
+                name="uniq_revision_section_reviewer",
+            )
+        ]
+
+
 class ReportApproval(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     report = models.ForeignKey(Report, on_delete=models.CASCADE, related_name="approvals")
