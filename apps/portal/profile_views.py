@@ -1,12 +1,11 @@
+from datetime import time
+
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
-from datetime import time
 
-from apps.cases.models import ReminderPreference
-
-from apps.cases.models import Case
+from apps.cases.models import Case, ReminderPreference
 from apps.intelligence.professional_catalog import (
     case_types_for,
     find_case_type,
