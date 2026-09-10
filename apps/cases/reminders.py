@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from asgiref.sync import async_to_sync
 from django.db import transaction
@@ -19,10 +19,22 @@ def get_preferences(user) -> ReminderPreference:
     return prefs
 
 
+def _as_time(value, fallback: time) -> time:
+    if isinstance(value, time):
+        return value
+    if isinstance(value, str):
+        try:
+            hour, minute = [int(part) for part in value.split(":", 1)]
+            return time(hour, minute)
+        except (TypeError, ValueError):
+            return fallback
+    return fallback
+
+
 def _in_quiet_hours(now_local, prefs: ReminderPreference) -> bool:
     current = now_local.time().replace(tzinfo=None)
-    start = prefs.quiet_start
-    end = prefs.quiet_end
+    start = _as_time(prefs.quiet_start, time(22, 0))
+    end = _as_time(prefs.quiet_end, time(8, 0))
     if start == end:
         return False
     if start < end:
@@ -34,9 +46,10 @@ def next_allowed_time(now, prefs: ReminderPreference):
     local_now = timezone.localtime(now)
     if not _in_quiet_hours(local_now, prefs):
         return now
-    end = prefs.quiet_end
+    start = _as_time(prefs.quiet_start, time(22, 0))
+    end = _as_time(prefs.quiet_end, time(8, 0))
     target_date = local_now.date()
-    if prefs.quiet_start > prefs.quiet_end and local_now.time().replace(tzinfo=None) >= prefs.quiet_start:
+    if start > end and local_now.time().replace(tzinfo=None) >= start:
         target_date += timedelta(days=1)
     local_target = datetime.combine(target_date, end)
     return timezone.make_aware(local_target, timezone.get_current_timezone())
@@ -47,7 +60,7 @@ def ensure_action_reminder(action: CaseAction, *, user=None, remind_at=None) -> 
         return None
     user = user or action.created_by or action.case.created_by
     prefs = get_preferences(user)
-    if not prefs.reminders_enabled:
+    if not prefs.reminders_enabled or not prefs.due_action_enabled:
         return None
     when = remind_at or action.due_at
     if when is None:
