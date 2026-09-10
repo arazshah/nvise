@@ -6,7 +6,7 @@ from typing import Any
 
 from apps.reports.models import ExpertFactDecision, Report, ReportClaim
 
-from .models import ExtractedFact, FollowUpQuestion, GoldenCase, GoldenCaseEvaluation
+from .models import CaseFieldIssue, ExtractedFact, FollowUpQuestion, GoldenCase, GoldenCaseEvaluation
 
 
 def _canonical(value: Any) -> str:
@@ -90,6 +90,25 @@ def _question_metrics(golden_case: GoldenCase) -> tuple[float, dict[str, Any]]:
     }
 
 
+def _expert_gap_metrics(golden_case: GoldenCase) -> tuple[float, dict[str, Any]]:
+    expected = set(golden_case.expected_expert_judgment_fact_keys or [])
+    if not expected:
+        return 1.0, {"expected_fact_keys": [], "found_fact_keys": [], "missing_fact_keys": []}
+    found = set(
+        CaseFieldIssue.objects.filter(
+            case=golden_case.case,
+            issue_type=CaseFieldIssue.IssueType.EXPERT_JUDGMENT,
+            field__key__in=expected,
+        ).values_list("field__key", flat=True)
+    )
+    recall = len(found) / len(expected)
+    return recall, {
+        "expected_fact_keys": sorted(expected),
+        "found_fact_keys": sorted(found),
+        "missing_fact_keys": sorted(expected - found),
+    }
+
+
 def _grounding_metrics(golden_case: GoldenCase) -> tuple[float, dict[str, Any]]:
     report = Report.objects.filter(case=golden_case.case).select_related("current_revision").first()
     revision = report.current_revision if report else None
@@ -112,11 +131,20 @@ def _grounding_metrics(golden_case: GoldenCase) -> tuple[float, dict[str, Any]]:
     }
 
 
-def _overall_score(*, recall: float, accuracy: float, redundant_rate: float, grounding: float, report_score: float | None) -> float:
+def _overall_score(
+    *,
+    recall: float,
+    accuracy: float,
+    redundant_rate: float,
+    expert_gap_recall: float,
+    grounding: float,
+    report_score: float | None,
+) -> float:
     components = [
-        (recall, 0.35),
-        (accuracy, 0.20),
-        (1.0 - min(max(redundant_rate, 0.0), 1.0), 0.20),
+        (recall, 0.30),
+        (accuracy, 0.15),
+        (1.0 - min(max(redundant_rate, 0.0), 1.0), 0.15),
+        (expert_gap_recall, 0.15),
         (grounding, 0.25),
     ]
     if report_score is not None:
@@ -129,12 +157,14 @@ def _overall_score(*, recall: float, accuracy: float, redundant_rate: float, gro
 def evaluate_golden_case(golden_case: GoldenCase, *, git_sha: str | None = None) -> GoldenCaseEvaluation:
     recall, accuracy, fact_details = _fact_metrics(golden_case)
     redundant_rate, question_details = _question_metrics(golden_case)
+    expert_gap_recall, expert_gap_details = _expert_gap_metrics(golden_case)
     grounding, grounding_details = _grounding_metrics(golden_case)
     report_score = golden_case.expert_report_score
     overall = _overall_score(
         recall=recall,
         accuracy=accuracy,
         redundant_rate=redundant_rate,
+        expert_gap_recall=expert_gap_recall,
         grounding=grounding,
         report_score=report_score,
     )
@@ -143,6 +173,7 @@ def evaluate_golden_case(golden_case: GoldenCase, *, git_sha: str | None = None)
         "fact_recall": recall >= golden_case.minimum_fact_recall,
         "exact_fact_accuracy": accuracy >= golden_case.minimum_fact_recall,
         "redundant_question_rate": redundant_rate <= golden_case.maximum_redundant_question_rate,
+        "expert_gap_recall": expert_gap_recall >= golden_case.minimum_expert_gap_recall,
         "claim_grounding_ratio": grounding >= golden_case.minimum_grounding_ratio,
     }
     passed = all(gates.values())
@@ -157,6 +188,7 @@ def evaluate_golden_case(golden_case: GoldenCase, *, git_sha: str | None = None)
         fact_recall=round(recall, 4),
         exact_fact_accuracy=round(accuracy, 4),
         redundant_question_rate=round(redundant_rate, 4),
+        expert_gap_recall=round(expert_gap_recall, 4),
         claim_grounding_ratio=round(grounding, 4),
         report_quality_score=report_score,
         overall_score=overall,
@@ -164,10 +196,13 @@ def evaluate_golden_case(golden_case: GoldenCase, *, git_sha: str | None = None)
             "gates": gates,
             "facts": fact_details,
             "questions": question_details,
+            "expert_gaps": expert_gap_details,
             "grounding": grounding_details,
+            "report_rubric": golden_case.report_rubric or {},
             "thresholds": {
                 "minimum_fact_recall": golden_case.minimum_fact_recall,
                 "maximum_redundant_question_rate": golden_case.maximum_redundant_question_rate,
+                "minimum_expert_gap_recall": golden_case.minimum_expert_gap_recall,
                 "minimum_grounding_ratio": golden_case.minimum_grounding_ratio,
             },
         },
