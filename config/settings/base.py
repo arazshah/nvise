@@ -136,6 +136,12 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 3600}
 CELERY_RESULT_EXPIRES = 86400
 CELERY_TASK_TIME_LIMIT = env.int("CELERY_TASK_TIME_LIMIT", default=300)
 CELERY_TASK_SOFT_TIME_LIMIT = env.int("CELERY_TASK_SOFT_TIME_LIMIT", default=270)
+CELERY_BEAT_SCHEDULE = {
+    "dispatch-case-reminders": {
+        "task": "apps.cases.tasks.dispatch_due_reminders",
+        "schedule": 300.0,
+    },
+}
 
 BALE_BOT_TOKEN = env("BALE_BOT_TOKEN", default="")
 BALE_BOT_ID = env("BALE_BOT_ID", default="primary")
