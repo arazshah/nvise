@@ -10,8 +10,8 @@ from apps.intelligence.followups import ensure_follow_up_questions, record_follo
 from apps.intelligence.models import CaseFieldIssue, ExtractedFact, ExtractionRun, FollowUpQuestion
 from apps.intelligence.playbooks import resolve_playbook
 from apps.messaging.models import ConversationState, InboundUpdate
-from apps.reports.models import Report
-from apps.reports.services import approve_report, generate_report_revision
+from apps.reports.models import Report, ReportSectionReview
+from apps.reports.services import approve_report, generate_report_revision, save_section_review
 from apps.tenants.models import Tenant, TenantMembership
 
 
@@ -88,8 +88,20 @@ def test_report_revision_and_approval_transition_case():
     assert revision.structured_data["facts"]["insured_name"]["value"] == "آراز شاهکرمی"
     assert revision.source_snapshot["playbook"] == playbook.key
 
+    with pytest.raises(ValueError, match="All sections"):
+        approve_report(case=case, user=user)
+
+    for section in revision.sections.all():
+        save_section_review(
+            case=case,
+            user=user,
+            section_id=section.id,
+            decision=ReportSectionReview.Decision.ACCEPTED,
+        )
+
     report = approve_report(case=case, user=user)
     case.refresh_from_db()
     assert report.status == Report.Status.APPROVED
     assert case.status == Case.Status.APPROVED
     assert report.approvals.count() == 1
+    assert revision.section_reviews.filter(reviewer=user).count() == revision.sections.count()
