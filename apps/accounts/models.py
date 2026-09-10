@@ -6,8 +6,16 @@ from django.db import models
 
 
 class User(AbstractUser):
+    class Profession(models.TextChoices):
+        INSURANCE_LOSS_ADJUSTER = "insurance_loss_adjuster", "کارشناس ارزیاب خسارت بیمه"
+        LAWYER = "lawyer", "وکیل / کارشناس حقوقی"
+        TECHNICAL_EXPERT = "technical_expert", "کارشناس / مشاور فنی"
+        OTHER = "other", "سایر"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     display_name = models.CharField(max_length=150, blank=True)
+    profession_key = models.CharField(max_length=64, choices=Profession.choices, blank=True, db_index=True)
+    specialty_key = models.CharField(max_length=96, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
