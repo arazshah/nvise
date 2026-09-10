@@ -113,6 +113,11 @@ def dashboard(request):
             distinct=True,
         ),
         message_count=Count("messages", distinct=True),
+        open_action_count=Count(
+            "actions",
+            filter=Q(actions__status=CaseAction.Status.OPEN),
+            distinct=True,
+        ),
     )
 
     active_count = cases.filter(lifecycle_status=Case.LifecycleStatus.ACTIVE).count()
@@ -120,6 +125,7 @@ def dashboard(request):
     needs_action_count = cases.filter(
         Q(analysis_status__in=[Case.AnalysisStatus.NEEDS_REVIEW, Case.AnalysisStatus.FAILED])
         | Q(report_status=Case.ReportStatus.READY_FOR_REVIEW)
+        | Q(open_action_count__gt=0)
     ).count()
     reports_ready_count = cases.filter(
         report_status__in=[Case.ReportStatus.READY_FOR_REVIEW, Case.ReportStatus.APPROVED]
@@ -130,6 +136,7 @@ def dashboard(request):
         cases.filter(
             Q(analysis_status__in=[Case.AnalysisStatus.NEEDS_REVIEW, Case.AnalysisStatus.FAILED])
             | Q(report_status=Case.ReportStatus.READY_FOR_REVIEW)
+            | Q(open_action_count__gt=0)
         )
         .order_by("-updated_at")[:5]
     )
