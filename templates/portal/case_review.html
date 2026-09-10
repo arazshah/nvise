@@ -1,115 +1,36 @@
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>بررسی گزارش {{ case.title|default:case.case_code }} | نویسه</title>
-  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css">
   <style>
-    *{box-sizing:border-box}body{font-family:Vazirmatn,Tahoma,sans-serif;background:#f4f7fb;margin:0;color:#172033;line-height:1.8}.wrap{max-width:1220px;margin:32px auto;padding:0 20px}.grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:22px}.card{background:#fff;border:1px solid #e8edf5;border-radius:22px;padding:24px;box-shadow:0 12px 36px rgba(21,36,72,.06);margin-bottom:18px}.hero{background:linear-gradient(135deg,#fff,#f3f6ff)}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.badge{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:#eef2ff;color:#3730a3;border-radius:999px;font-size:13px;font-weight:700}.badge.ok{background:#ecfdf3;color:#166534}.badge.wait{background:#fff7ed;color:#9a3412}.badge.bad{background:#fef2f2;color:#991b1b}.muted{color:#667085}.field,textarea,select{width:100%;font:inherit;background:#fff;border:1px solid #d7deea;border-radius:13px;padding:12px 14px;margin-top:7px;outline:none;transition:.2s}textarea{min-height:145px;resize:vertical}.field:focus,textarea:focus,select:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1)}label{display:block;font-weight:700;margin-bottom:18px}.btn{font:inherit;border:0;border-radius:13px;padding:11px 18px;background:#1e293b;color:#fff;cursor:pointer;font-weight:700;text-decoration:none;display:inline-flex}.btn.approve{background:#15803d}.btn.secondary{background:#eef2ff;color:#1e293b}.btn:disabled{opacity:.45;cursor:not-allowed}.evidence{background:#f8fafc;border-right:4px solid #c7d2fe;padding:12px 14px;margin:10px 0;border-radius:12px;font-size:14px;scroll-margin-top:24px}.evidence:target{outline:3px solid #a5b4fc;background:#eef2ff}.evidence-title{font-weight:800;color:#3730a3}.doc{padding:12px;border-radius:14px;background:#f8fafc;margin-bottom:10px}a{color:#4338ca;text-decoration:none;font-weight:700}h1,h2,h3{line-height:1.45}.topline{font-size:13px;color:#6366f1;font-weight:800;margin-bottom:6px}.hero-actions{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}.limitations{background:#fffaf0;border:1px solid #fed7aa;border-right:5px solid #f59e0b}.limitations h3{margin-top:0;color:#92400e}.limitation-item{background:#fff;border:1px solid #fde7c2;border-radius:14px;padding:13px 15px;margin-top:10px}.limitation-item strong{display:block;color:#7c2d12;margin-bottom:4px}.progress{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}.metric{padding:13px;border-radius:14px;background:#f8fafc;text-align:center}.metric strong{display:block;font-size:20px}.fact{border:1px solid #e5e7eb;border-radius:16px;padding:15px;margin-top:12px}.fact-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.sources{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.source-link{font-size:12px;padding:5px 9px;background:#eef2ff;border-radius:999px}.review-card{border:1px solid #e5e7eb;border-radius:18px;padding:18px;margin-top:14px}.review-card.accepted{border-right:5px solid #22c55e}.review-card.needs_edit{border-right:5px solid #f59e0b}.review-card.rejected{border-right:5px solid #ef4444}.choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.choice{border:1px solid #e5e7eb;border-radius:12px;padding:9px;font-weight:700}.evidence-checks{max-height:220px;overflow:auto;background:#f8fafc;padding:10px;border-radius:12px}.evidence-checks label{margin:0;padding:7px;font-weight:500}.evidence-checks input{margin-left:7px}.section-preview{white-space:pre-wrap;background:#f8fafc;border-radius:12px;padding:12px;margin:10px 0}.approval-gate{border:1px solid #bfdbfe;background:#eff6ff}.approval-gate.ready{border-color:#bbf7d0;background:#f0fdf4}@media(max-width:820px){.grid{grid-template-columns:1fr}.progress,.choice-grid{grid-template-columns:1fr}.wrap{margin:18px auto;padding:0 12px}.card{border-radius:17px;padding:18px}}
+    *{box-sizing:border-box}body{font-family:Vazirmatn,Tahoma,sans-serif;background:#f4f7fb;margin:0;color:#172033;line-height:1.8}.wrap{max-width:1220px;margin:30px auto;padding:0 18px}.grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(290px,1fr);gap:20px}.card{background:#fff;border:1px solid #e8edf5;border-radius:20px;padding:22px;box-shadow:0 10px 34px rgba(21,36,72,.05);margin-bottom:18px}.hero{background:linear-gradient(135deg,#fff,#eef2ff)}.row,.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.badge{display:inline-flex;padding:6px 10px;background:#eef2ff;color:#3730a3;border-radius:999px;font-size:12px;font-weight:800}.badge.ok{background:#ecfdf3;color:#166534}.badge.wait{background:#fff7ed;color:#9a3412}.badge.bad{background:#fef2f2;color:#991b1b}.muted{color:#667085}.field,textarea{width:100%;font:inherit;background:#fff;border:1px solid #d7deea;border-radius:12px;padding:11px 13px;margin-top:6px}textarea{min-height:130px;resize:vertical}label{display:block;font-weight:700;margin-bottom:16px}.btn{font:inherit;border:0;border-radius:12px;padding:10px 15px;background:#1e293b;color:#fff;cursor:pointer;font-weight:800;text-decoration:none;display:inline-flex}.btn.secondary{background:#eef2ff;color:#1e293b}.btn.approve{background:#15803d}.btn:disabled{opacity:.45;cursor:not-allowed}.progress{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}.metric{padding:12px;border-radius:13px;background:#f8fafc;text-align:center}.metric strong{display:block;font-size:19px}.fact{border:1px solid #e5e7eb;border-radius:14px;padding:13px;margin-top:10px}.sources{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.source-link{font-size:12px;padding:4px 8px;background:#eef2ff;border-radius:999px}.review-card{border:1px solid #e5e7eb;border-radius:16px;padding:16px;margin-top:12px}.review-card.accepted{border-right:5px solid #22c55e}.review-card.needs_edit{border-right:5px solid #f59e0b}.review-card.rejected{border-right:5px solid #ef4444}.choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.choice{border:1px solid #e5e7eb;border-radius:10px;padding:8px;font-weight:700}.evidence-checks{max-height:190px;overflow:auto;background:#f8fafc;padding:9px;border-radius:11px}.evidence-checks label{margin:0;padding:6px;font-weight:500}.section-preview{white-space:pre-wrap;background:#f8fafc;border-radius:11px;padding:11px;margin:9px 0}.evidence{background:#f8fafc;border-right:4px solid #c7d2fe;padding:11px 13px;margin:9px 0;border-radius:11px;font-size:13px;scroll-margin-top:24px}.evidence:target{outline:3px solid #a5b4fc;background:#eef2ff}.approval-gate{background:#eff6ff;border-color:#bfdbfe}.approval-gate.ready{background:#f0fdf4;border-color:#bbf7d0}.stale{background:#fff7ed;border-color:#fdba74}.limitations{background:#fffaf0;border-color:#fed7aa}@media(max-width:820px){.grid,.progress,.choice-grid{grid-template-columns:1fr}.wrap{padding:0 10px}}
   </style>
 </head>
-<body>
-<div class="wrap">
+<body><div class="wrap">
   <div class="card hero">
-    <div class="topline">نویسه • Expert Review & Evidence Grounding</div>
-    <div class="row">
-      <h1 style="margin:0">{{ case.title|default:case.case_code }}</h1>
-      {% if case.status == 'ready_for_review' %}<span class="badge">🟣 آماده بررسی و تأیید</span>{% elif case.status == 'approved' %}<span class="badge ok">✅ تأیید شده</span>{% else %}<span class="badge">{{ case.status }}</span>{% endif %}
-      {% if revision %}<span class="badge">📄 نسخه {{ revision.revision_number }}</span>{% endif %}
-    </div>
+    <div class="badge">نویسه • بررسی تخصصی و مستند گزارش</div>
+    <div class="row"><h1 style="margin:8px 0">{{ case.title|default:case.case_code }}</h1>{% if report.status == 'ready_for_review' %}<span class="badge">🟣 آماده بررسی</span>{% elif report.status == 'approved' %}<span class="badge ok">✅ تأیید شده</span>{% elif report.status == 'draft' %}<span class="badge wait">♻️ نیازمند بازسازی</span>{% endif %}{% if revision %}<span class="badge">نسخه {{ revision.revision_number }}</span>{% endif %}</div>
     <p class="muted">کد پرونده: {{ case.case_code }}</p>
-    <div class="hero-actions">
-      <a class="btn secondary" href="{% url 'portal:dashboard' %}">داشبورد</a>
-      <a class="btn secondary" href="{% url 'portal:case-repository' case.case_code %}">📁 مخزن پرونده</a>
-      <a class="btn secondary" href="{% url 'portal:analysis-overview' case.case_code %}">🧠 نتیجه تحلیل</a>
-    </div>
+    <div class="actions"><a class="btn secondary" href="{% url 'portal:dashboard' %}">داشبورد</a><a class="btn secondary" href="{% url 'portal:case-repository' case.case_code %}">📁 مخزن پرونده</a><a class="btn secondary" href="{% url 'portal:analysis-overview' case.case_code %}">🧠 نتیجه تحلیل</a>{% if revision %}<a class="btn" href="{% url 'portal:grounding-overview' case.case_code %}">🔗 کنترل ادعاها و Factها</a>{% endif %}</div>
   </div>
 
-  {% if revision and review_progress %}
-  <div class="card approval-gate {% if review_progress.can_approve %}ready{% endif %}">
-    <h2 style="margin-top:0">🧭 وضعیت بررسی کارشناسی</h2>
-    <p class="muted">تأیید نهایی فقط وقتی فعال است که کارشناس تأییدکننده تمام بخش‌های همین نسخه را صریحاً پذیرفته باشد.</p>
-    <div class="progress">
-      <div class="metric"><strong>{{ review_progress.total }}</strong><span>کل بخش‌ها</span></div>
-      <div class="metric"><strong>{{ review_progress.accepted }}</strong><span>تأیید شده</span></div>
-      <div class="metric"><strong>{{ review_progress.needs_edit }}</strong><span>نیازمند اصلاح</span></div>
-      <div class="metric"><strong>{{ review_progress.rejected }}</strong><span>رد شده</span></div>
-      <div class="metric"><strong>{{ review_progress.remaining }}</strong><span>بررسی‌نشده</span></div>
-    </div>
-  </div>
-  {% endif %}
+  {% if report.status == 'draft' and revision %}<div class="card stale"><h2 style="margin-top:0">♻️ Factهای پرونده پس از این نسخه تغییر کرده‌اند</h2><p>برای جلوگیری از تأیید اطلاعات قدیمی، این نسخه فعلاً قابل تأیید نیست. وارد «کنترل ادعاها و Factها» شوید و گزارش را با اصلاحات کارشناسی بازسازی کنید.</p><a class="btn" href="{% url 'portal:grounding-overview' case.case_code %}">بازسازی و کنترل grounding</a></div>{% endif %}
 
-  {% if revision and revision.structured_data.has_limitations %}
-  <div class="card limitations">
-    <h3>⚠️ این گزارش با اطلاعات ناقص یا نامشخص تهیه شده است</h3>
-    {% for item in revision.structured_data.limitations %}
-    <div class="limitation-item"><strong>{{ item.field_label }}</strong><div>{{ item.issue_type_label }} • {{ item.resolution_label }}</div>{% if item.resolution_note %}<div class="muted">{{ item.resolution_note }}</div>{% endif %}</div>
-    {% endfor %}
-  </div>
-  {% endif %}
+  {% if revision and review_progress %}<div class="card approval-gate {% if review_progress.can_approve %}ready{% endif %}"><h2 style="margin-top:0">🧭 وضعیت بررسی کارشناسی</h2><p class="muted">تأیید نهایی زمانی فعال می‌شود که هم بخش‌های گزارش و هم ادعاهای مادی نسخه جاری توسط شما تأیید شده باشند.</p><div class="progress"><div class="metric"><strong>{{ review_progress.accepted }}/{{ review_progress.total }}</strong><span>بخش‌های تأییدشده</span></div><div class="metric"><strong>{{ review_progress.claim_accepted }}/{{ review_progress.claim_total }}</strong><span>ادعاهای تأییدشده</span></div><div class="metric"><strong>{{ review_progress.needs_edit|add:review_progress.claim_needs_edit }}</strong><span>نیازمند اصلاح</span></div><div class="metric"><strong>{{ review_progress.remaining|add:review_progress.claim_remaining }}</strong><span>بررسی‌نشده</span></div></div></div>{% endif %}
 
-  <div class="grid"><main>
-    {% if revision %}
-    <div class="card">
-      <h2>🔗 Fact Ledger و منشأ هر داده</h2>
-      <p class="muted">این قسمت متن گزارش نیست؛ لایه کنترل و provenance است. هر Fact به Evidence استخراج‌شده از پرونده وصل می‌شود.</p>
-      {% for row in fact_rows %}
-      <div class="fact">
-        <div class="fact-head"><strong>{{ row.fact.label }}</strong>{% if row.fact.confidence != None %}<span class="badge">Confidence: {{ row.fact.confidence|floatformat:2 }}</span>{% endif %}</div>
-        <div>{{ row.fact.value }}</div>
-        <div class="sources">
-          {% for source in row.sources %}<a class="source-link" href="#evidence-{{ source.evidence.id }}">🔎 منبع {{ forloop.counter }}{% if source.reference.page %} • صفحه {{ source.reference.page }}{% endif %}{% if source.reference.start_ms != None %} • صوت {{ source.reference.start_ms }}–{{ source.reference.end_ms }}ms{% endif %}</a>{% empty %}<span class="badge wait">بدون Evidence قابل ردیابی</span>{% endfor %}
-        </div>
-      </div>
-      {% empty %}<p class="muted">Fact ساختاریافته‌ای در این نسخه ثبت نشده است.</p>{% endfor %}
-    </div>
+  {% if revision and revision.structured_data.has_limitations %}<div class="card limitations"><h3>⚠️ محدودیت‌های این نسخه</h3>{% for item in revision.structured_data.limitations %}<div class="fact"><strong>{{ item.field_label }}</strong><div>{{ item.issue_type_label }} • {{ item.resolution_label }}</div>{% if item.resolution_note %}<div class="muted">{{ item.resolution_note }}</div>{% endif %}</div>{% endfor %}</div>{% endif %}
 
-    <form method="post" action="{% url 'portal:edit-report' case.case_code %}">{% csrf_token %}
-      <div class="card"><h2>📝 ویرایش متن گزارش</h2><p class="muted">ذخیره تغییرات یک revision جدید می‌سازد؛ تصمیم‌های Review نسخه فعلی به revision جدید منتقل نمی‌شوند.</p><label>عنوان گزارش<input class="field" name="title" value="{{ revision.title }}"></label><label>خلاصه گزارش<textarea name="summary">{{ revision.summary }}</textarea></label></div>
-      {% for section in sections %}<div class="card"><h2>{{ section.title }}</h2><textarea name="section_{{ section.key }}">{{ section.content }}</textarea></div>{% endfor %}
-      {% if case.status == 'ready_for_review' %}<button class="btn" type="submit">💾 ذخیره تغییرات به‌عنوان نسخه جدید</button>{% endif %}
-    </form>
+  <div class="grid"><main>{% if revision %}
+    <div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">🔗 Fact Ledger</h2><p class="muted">برای تأیید، اصلاح یا رد خود Factها از فضای کنترل grounding استفاده کنید.</p></div><a class="btn secondary" href="{% url 'portal:grounding-overview' case.case_code %}">کنترل Factها و Claimها</a></div>{% for row in fact_rows %}<div class="fact"><strong>{{ row.fact.label }}</strong>{% if row.fact.confidence != None %} <span class="badge">اطمینان {{ row.fact.confidence|floatformat:2 }}</span>{% endif %}<div>{{ row.fact.value }}</div><div class="sources">{% for source in row.sources %}<a class="source-link" href="#evidence-{{ source.evidence.id }}">🔎 منبع {{ forloop.counter }}{% if source.reference.page %} • صفحه {{ source.reference.page }}{% endif %}</a>{% empty %}<span class="badge wait">بدون Evidence مستقیم</span>{% endfor %}</div></div>{% empty %}<p class="muted">Fact ساختاریافته‌ای ثبت نشده است.</p>{% endfor %}</div>
 
-    {% if case.status == 'ready_for_review' %}
-    <div class="card" style="margin-top:18px">
-      <h2>🧑‍⚖️ تصمیم کارشناسی برای هر بخش</h2>
-      <p class="muted">برای هر بخش نتیجه را مشخص کنید و Evidenceهایی را که واقعاً مبنای تصمیم شما بوده‌اند انتخاب کنید.</p>
-      {% for row in section_rows %}
-      <div class="review-card {% if row.review %}{{ row.review.decision }}{% endif %}">
-        <h3>{{ row.section.title }}</h3>
-        <div class="section-preview">{{ row.section.content }}</div>
-        {% if row.review %}
-          {% if row.review.decision == 'accepted' %}<span class="badge ok">✅ پذیرفته شده</span>{% elif row.review.decision == 'needs_edit' %}<span class="badge wait">✏️ نیازمند اصلاح</span>{% else %}<span class="badge bad">⛔ رد شده</span>{% endif %}
-          {% if row.review.note %}<p class="muted">یادداشت فعلی: {{ row.review.note }}</p>{% endif %}
-        {% endif %}
-        <form method="post" action="{% url 'portal:review-section' case.case_code row.section.id %}">{% csrf_token %}
-          <div class="choice-grid">
-            <label class="choice"><input type="radio" name="decision" value="accepted" required {% if row.review.decision == 'accepted' %}checked{% endif %}> ✅ تأیید</label>
-            <label class="choice"><input type="radio" name="decision" value="needs_edit" required {% if row.review.decision == 'needs_edit' %}checked{% endif %}> ✏️ نیازمند اصلاح</label>
-            <label class="choice"><input type="radio" name="decision" value="rejected" required {% if row.review.decision == 'rejected' %}checked{% endif %}> ⛔ رد</label>
-          </div>
-          <label>یادداشت کارشناسی<textarea name="note" style="min-height:90px">{% if row.review %}{{ row.review.note }}{% endif %}</textarea></label>
-          <strong>Evidence مبنای این تصمیم</strong>
-          <div class="evidence-checks">
-            {% for item in evidence %}<label><input type="checkbox" name="evidence_ids" value="{{ item.id }}">{{ item.text|truncatechars:100 }}</label>{% empty %}<span class="muted">Evidence ثبت نشده است.</span>{% endfor %}
-          </div>
-          <button class="btn secondary" type="submit" style="margin-top:10px">ثبت تصمیم این بخش</button>
-        </form>
-      </div>
-      {% endfor %}
-    </div>
+    <form method="post" action="{% url 'portal:edit-report' case.case_code %}">{% csrf_token %}<div class="card"><h2>📝 متن گزارش</h2><p class="muted">ویرایش متن یک revision جدید می‌سازد و بررسی همان نسخه باید دوباره انجام شود.</p><label>عنوان<input class="field" name="title" value="{{ revision.title }}"></label><label>خلاصه<textarea name="summary">{{ revision.summary }}</textarea></label></div>{% for section in sections %}<div class="card"><h2>{{ section.title }}</h2><textarea name="section_{{ section.key }}">{{ section.content }}</textarea></div>{% endfor %}{% if report.status == 'ready_for_review' %}<button class="btn" type="submit">💾 ذخیره به‌عنوان نسخه جدید</button>{% endif %}</form>
 
-    <form method="post" action="{% url 'portal:approve-report' case.case_code %}" style="margin-top:14px">{% csrf_token %}
-      <div class="card"><h3>✅ تأیید نهایی</h3><p class="muted">{% if review_progress.can_approve %}همه بخش‌های این نسخه توسط شما تأیید شده‌اند و گزارش آماده تأیید نهایی است.{% else %}ابتدا تمام بخش‌های این revision را بررسی و روی «تأیید» قرار دهید.{% endif %}</p><input class="field" name="note" placeholder="یادداشت تأیید (اختیاری)"><button class="btn approve" type="submit" {% if not review_progress.can_approve %}disabled{% endif %}>تأیید نهایی گزارش</button></div>
-    </form>
-    {% endif %}
-    {% else %}<div class="card">⏳ هنوز نسخه‌ای برای بررسی تولید نشده است.</div>{% endif %}
-  </main><aside>
-    <div class="card"><h3>📄 اسناد خروجی</h3>{% for document in documents %}<div class="doc">{% if document.status == 'ready' %}<span class="badge ok">✅ آماده دانلود</span>{% else %}<span class="badge">{{ document.status }}</span>{% endif %}<div style="margin-top:8px">{{ document.filename|default:'فایل Word گزارش' }}</div>{% if document.status == 'ready' %}<a href="{% url 'portal:download-document' case.case_code document.id %}">⬇️ دانلود فایل Word</a>{% endif %}</div>{% empty %}<p class="muted">پس از تأیید نهایی، فایل Word گزارش ساخته می‌شود.</p>{% endfor %}</div>
-    <div class="card"><h3>🔎 Evidence پرونده</h3><p class="muted">لینک‌های Fact Ledger مستقیماً به Evidence متناظر در این قسمت می‌آیند.</p>
-      {% for item in evidence %}<div class="evidence" id="evidence-{{ item.id }}"><div class="evidence-title">{% if item.source_kind == 'message' %}💬 پیام ثبت‌شده{% elif item.source_kind == 'transcript_segment' %}🎙 متن استخراج‌شده از صوت{% elif item.source_kind == 'document_page' %}📄 صفحه سند{% elif item.source_kind == 'image_analysis' %}🖼 تحلیل تصویر{% else %}📌 Evidence{% endif %}</div>{% if item.metadata.filename %}<div class="muted">{{ item.metadata.filename }}{% if item.metadata.page %} • صفحه {{ item.metadata.page }}{% endif %}</div>{% endif %}{% if item.start_ms != None %}<div class="muted">بازه صوتی: {{ item.start_ms }} تا {{ item.end_ms }} میلی‌ثانیه</div>{% endif %}<div>{{ item.text }}</div></div>{% empty %}<p class="muted">هنوز Evidenceای برای این پرونده ثبت نشده است.</p>{% endfor %}
-    </div>
-  </aside></div>
-</div>
-</body></html>
+    {% if report.status == 'ready_for_review' %}<div class="card" style="margin-top:18px"><h2>🧑‍⚖️ تصمیم برای هر بخش</h2>{% for row in section_rows %}<div class="review-card {% if row.review %}{{ row.review.decision }}{% endif %}"><h3>{{ row.section.title }}</h3><div class="section-preview">{{ row.section.content }}</div>{% if row.review %}<span class="badge {% if row.review.decision == 'accepted' %}ok{% elif row.review.decision == 'rejected' %}bad{% else %}wait{% endif %}">{{ row.review.get_decision_display }}</span>{% endif %}<form method="post" action="{% url 'portal:review-section' case.case_code row.section.id %}">{% csrf_token %}<div class="choice-grid"><label class="choice"><input type="radio" name="decision" value="accepted" required {% if row.review.decision == 'accepted' %}checked{% endif %}> ✅ تأیید</label><label class="choice"><input type="radio" name="decision" value="needs_edit" required {% if row.review.decision == 'needs_edit' %}checked{% endif %}> ✏️ اصلاح</label><label class="choice"><input type="radio" name="decision" value="rejected" required {% if row.review.decision == 'rejected' %}checked{% endif %}> ⛔ رد</label></div><label>یادداشت<textarea name="note" style="min-height:80px">{% if row.review %}{{ row.review.note }}{% endif %}</textarea></label><strong>Evidence مبنا</strong><div class="evidence-checks">{% for item in evidence %}<label><input type="checkbox" name="evidence_ids" value="{{ item.id }}">{{ item.text|truncatechars:90 }}</label>{% empty %}<span class="muted">Evidence ثبت نشده است.</span>{% endfor %}</div><button class="btn secondary" type="submit" style="margin-top:9px">ثبت تصمیم بخش</button></form></div>{% endfor %}</div>
+
+    <form method="post" action="{% url 'portal:approve-report' case.case_code %}">{% csrf_token %}<div class="card"><h3>✅ تأیید نهایی</h3><p class="muted">{% if review_progress.can_approve %}تمام بخش‌ها و ادعاهای این نسخه تأیید شده‌اند.{% else %}ابتدا بخش‌ها را در این صفحه و claimها را در «کنترل ادعاها و Factها» تأیید کنید.{% endif %}</p><input class="field" name="note" placeholder="یادداشت تأیید (اختیاری)"><button class="btn approve" type="submit" {% if not review_progress.can_approve %}disabled{% endif %}>تأیید نهایی گزارش</button></div></form>{% endif %}
+  {% else %}<div class="card">⏳ هنوز نسخه‌ای برای بررسی تولید نشده است.</div>{% endif %}</main>
+
+  <aside><div class="card"><h3>📄 اسناد خروجی</h3>{% for document in documents %}<div class="fact">{% if document.status == 'ready' %}<span class="badge ok">✅ آماده</span>{% else %}<span class="badge">{{ document.status }}</span>{% endif %}<div>{{ document.filename|default:'فایل Word گزارش' }}</div>{% if document.status == 'ready' %}<a href="{% url 'portal:download-document' case.case_code document.id %}">⬇️ دانلود Word</a>{% endif %}</div>{% empty %}<p class="muted">پس از تأیید، فایل Word ساخته می‌شود.</p>{% endfor %}</div><div class="card"><h3>🔎 Evidence پرونده</h3>{% for item in evidence %}<div class="evidence" id="evidence-{{ item.id }}"><strong>{% if item.source_kind == 'transcript_segment' %}🎙 صوت{% elif item.source_kind == 'document_page' %}📄 سند{% elif item.source_kind == 'image_analysis' %}🖼 تصویر{% else %}💬 پیام{% endif %}</strong>{% if item.metadata.filename %}<div class="muted">{{ item.metadata.filename }}{% if item.metadata.page %} • صفحه {{ item.metadata.page }}{% endif %}</div>{% endif %}<div>{{ item.text }}</div></div>{% empty %}<p class="muted">Evidence ثبت نشده است.</p>{% endfor %}</div></aside></div>
+</div></body></html>
