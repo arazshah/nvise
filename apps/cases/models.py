@@ -64,6 +64,7 @@ class Case(models.Model):
     )
     vertical_key = models.CharField(max_length=64, blank=True)
     sub_vertical_key = models.CharField(max_length=64, blank=True)
+    case_type_key = models.CharField(max_length=96, blank=True, db_index=True)
     opened_at = models.DateTimeField(null=True, blank=True)
     finalized_at = models.DateTimeField(null=True, blank=True)
     approved_at = models.DateTimeField(null=True, blank=True)
