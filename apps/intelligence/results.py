@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from apps.cases.models import Case, CaseEvent
 
+from .fact_ledger import latest_fact_ledger, ledger_quality_summary
 from .models import CaseFieldIssue, ExtractedFact
 
 
@@ -30,6 +31,7 @@ def analysis_result_summary(case: Case) -> dict:
     conflicts = issues.filter(issue_type=CaseFieldIssue.IssueType.CONFLICT).count()
     invalid = issues.filter(issue_type=CaseFieldIssue.IssueType.INVALID).count()
     open_issues = missing + conflicts + invalid
+    quality = ledger_quality_summary(case)
 
     return {
         "usable_facts": usable_facts,
@@ -38,6 +40,8 @@ def analysis_result_summary(case: Case) -> dict:
         "conflicts": conflicts,
         "invalid": invalid,
         "has_issues": open_issues > 0,
+        "sourced_facts": quality["sourced"],
+        "high_confidence_facts": quality["high_confidence"],
     }
 
 
@@ -50,11 +54,30 @@ def analysis_result_keyboard(case: Case) -> dict:
     else:
         rows.append([{"text": GENERATE_REPORT_LABEL}, {"text": ADD_EVIDENCE_LABEL}])
 
-    # Global navigation must always remain visible so analysis never traps the user
-    # inside one case. These actions are handled by the normal messaging workflow.
     rows.append([{"text": NEW_CASE_LABEL}, {"text": MY_CASES_LABEL}])
     rows.append([{"text": HOME_MENU_LABEL}])
     return {"keyboard": rows, "resize_keyboard": True}
+
+
+def _render_fact_preview(case: Case, limit: int = 5) -> list[str]:
+    rows = latest_fact_ledger(case)
+    if not rows:
+        return []
+    lines = ["", "📌 چند یافته مستند پرونده"]
+    for row in rows[:limit]:
+        value = str(row["value"])
+        if len(value) > 120:
+            value = value[:117] + "..."
+        source = row["sources"][0]["label"] if row["sources"] else "بدون منبع مستقیم"
+        confidence = row["confidence"]
+        confidence_text = ""
+        if confidence is not None:
+            confidence_text = f" · اطمینان {round(confidence * 100)}٪"
+        lines.append(f"• {row['label']}: {value}")
+        lines.append(f"  ↳ {source}{confidence_text}")
+    if len(rows) > limit:
+        lines.append(f"… و {len(rows) - limit} یافته دیگر")
+    return lines
 
 
 def analysis_result_text(case: Case) -> str:
@@ -65,15 +88,18 @@ def analysis_result_text(case: Case) -> str:
         f"📝 {case.title or case.case_code}",
         "",
         f"✅ اطلاعات قابل استفاده: {summary['usable_facts']}",
+        f"🔗 یافته‌های متصل به مدرک: {summary['sourced_facts']}",
+        f"🎯 یافته‌های با اطمینان بالا: {summary['high_confidence_facts']}",
         f"⚠️ موارد مبهم یا متناقض: {summary['conflicts'] + summary['invalid']}",
-        f"❓ موارد پیدا نشده: {summary['missing']}",
+        f"❓ موارد واقعاً پیدا نشده: {summary['missing']}",
     ]
+    lines.extend(_render_fact_preview(case))
     if summary["has_issues"]:
         lines.extend(
             [
                 "",
-                f"در مجموع {summary['open_issues']} مورد نیاز به تصمیم شما دارد.",
-                "می‌توانید موارد را رفع کنید، مدرک بیشتری اضافه کنید یا با اطلاعات فعلی ادامه دهید.",
+                f"در مجموع {summary['open_issues']} مورد نیاز به تصمیم یا بررسی شما دارد.",
+                "نویسه ابتدا مدارک و صوت‌های پرونده را بررسی کرده است؛ اگر هنوز موردی باز مانده، می‌توانید آن را رفع کنید، مدرک بیشتری اضافه کنید یا با اطلاعات فعلی ادامه دهید.",
             ]
         )
     else:
