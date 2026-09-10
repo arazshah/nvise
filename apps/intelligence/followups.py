@@ -9,6 +9,7 @@ from apps.messaging.providers.bale import BaleProvider
 from apps.system.integrations import get_bale_config
 
 from .models import CaseFieldIssue, FollowUpQuestion
+from .question_planner import plan_question
 
 
 MAX_FOLLOW_UP_ATTEMPTS = 2
@@ -19,43 +20,28 @@ NEW_CASE_LABEL = "➕ پرونده جدید"
 MY_CASES_LABEL = "📂 پرونده‌های من"
 
 
-def _detail_lines(issue: CaseFieldIssue) -> list[str]:
-    details = issue.details or {}
-    lines: list[str] = []
-    if issue.issue_type == CaseFieldIssue.IssueType.MISSING:
-        lines.append("این مورد در متن‌ها، صوت‌ها یا مدارک پرونده پیدا نشد.")
-    elif issue.issue_type == CaseFieldIssue.IssueType.CONFLICT:
-        values = details.get("values") or details.get("candidates") or []
-        if values:
-            rendered = "، ".join(str(value) for value in values[:4])
-            lines.append(f"چند مقدار متفاوت پیدا شده است: {rendered}")
-        else:
-            lines.append("برای این مورد اطلاعات متفاوت یا متناقض پیدا شده است.")
-    elif issue.issue_type == CaseFieldIssue.IssueType.INVALID:
-        value = details.get("value")
-        if value is not None:
-            lines.append(f"مقدار فعلی «{value}» با قالب مورد انتظار سازگار نیست.")
-        else:
-            lines.append("مقدار استخراج‌شده با قالب مورد انتظار سازگار نیست.")
-    if issue.resolution_note:
-        lines.append(f"پاسخ قبلی شما: {issue.resolution_note}")
-    if issue.attempt_count >= MAX_FOLLOW_UP_ATTEMPTS:
-        lines.append(
-            "این مورد دو بار بررسی شده است. برای جلوگیری از تکرار بی‌پایان، "
-            "اگر هنوز مقدار قطعی ندارید یکی از گزینه‌های پایین را انتخاب کنید."
-        )
-    return lines
-
-
 def _question_text(issue: CaseFieldIssue) -> str:
-    if issue.issue_type == CaseFieldIssue.IssueType.MISSING:
-        prompt = f"لطفاً اگر در دسترس است، «{issue.field.label}» را مشخص کنید."
-    elif issue.issue_type == CaseFieldIssue.IssueType.CONFLICT:
-        prompt = f"لطفاً مقدار صحیح «{issue.field.label}» را مشخص یا تأیید کنید."
-    else:
-        prompt = f"لطفاً مقدار معتبر برای «{issue.field.label}» ارائه کنید."
-    details = _detail_lines(issue)
-    return "\n".join([*details, "", prompt]).strip()
+    plan = plan_question(issue)
+    lines = [f"🧠 {plan.title}", "", plan.explanation]
+    if plan.sources:
+        lines.extend(["", "🔗 شواهد مرتبط:"])
+        lines.extend(f"• {source}" for source in plan.sources)
+    if plan.candidates:
+        lines.extend(["", "📌 مقادیر پیدا شده:"])
+        lines.extend(f"• {candidate}" for candidate in plan.candidates)
+    if plan.prompt:
+        lines.extend(["", f"❓ {plan.prompt}"])
+    if issue.resolution_note:
+        lines.extend(["", f"پاسخ قبلی شما: {issue.resolution_note}"])
+    if issue.attempt_count >= MAX_FOLLOW_UP_ATTEMPTS:
+        lines.extend(
+            [
+                "",
+                "این موضوع قبلاً دو بار بررسی شده است. برای جلوگیری از تکرار بی‌پایان، "
+                "اگر پاسخ قطعی در دسترس نیست یکی از گزینه‌های پایین را انتخاب کنید.",
+            ]
+        )
+    return "\n".join(line for line in lines if line is not None).strip()
 
 
 def follow_up_keyboard() -> dict:
@@ -96,12 +82,36 @@ def _store_answer_evidence(*, question, inbound, user, message):
 @transaction.atomic
 def ensure_follow_up_questions(case: Case) -> list[FollowUpQuestion]:
     questions = []
-    issues = (
-        CaseFieldIssue.objects.filter(case=case, status=CaseFieldIssue.Status.OPEN)
+    issues = list(
+        CaseFieldIssue.objects.select_for_update()
+        .filter(case=case, status=CaseFieldIssue.Status.OPEN)
         .select_related("field")
         .order_by("field__sequence", "created_at")
     )
+    now = timezone.now()
     for issue in issues:
+        plan = plan_question(issue)
+        issue.details = {
+            **(issue.details or {}),
+            "planner_category": plan.category,
+            "planner_title": plan.title,
+            "planner_sources": list(plan.sources),
+            "planner_candidates": list(plan.candidates),
+        }
+        if not plan.should_ask:
+            issue.status = CaseFieldIssue.Status.RESOLVED
+            issue.resolved_at = now
+            issue.resolution_note = plan.explanation[:1000]
+            issue.save(
+                update_fields=["details", "status", "resolved_at", "resolution_note"]
+            )
+            FollowUpQuestion.objects.filter(issue=issue).update(
+                status=FollowUpQuestion.Status.CANCELLED,
+                answered_at=now,
+            )
+            continue
+
+        issue.save(update_fields=["details"])
         question, created = FollowUpQuestion.objects.get_or_create(
             issue=issue,
             defaults={"case": case, "question_text": _question_text(issue)},
@@ -158,13 +168,13 @@ def send_next_follow_up(case: Case) -> FollowUpQuestion | None:
     provider = BaleProvider(bale.bot_token)
     async_to_sync(provider.send_text)(
         state.external_chat_id,
-        f"🧩 تکمیل اطلاعات پرونده\n"
+        f"🧩 بررسی تخصصی پرونده\n"
         f"━━━━━━━━━━━━━━\n"
         f"📝 {case.title or case.case_code}\n"
         f"❓ مورد {number} از {total or 1}\n\n"
         f"{question.question_text}\n\n"
         "✍️ می‌توانید پاسخ را بنویسید یا یکی از گزینه‌های زیر را انتخاب کنید.\n"
-        "اگر می‌خواهید فعلاً از این پرونده خارج شوید، منوی اصلی یا پرونده‌های من همیشه در دسترس است.",
+        "نویسه فقط مواردی را می‌پرسد که پس از بررسی شواهد هنوز به تصمیم شما نیاز دارند.",
         follow_up_keyboard(),
     )
     question.status = FollowUpQuestion.Status.ASKED
