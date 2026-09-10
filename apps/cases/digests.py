@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from asgiref.sync import async_to_sync
 from django.db.models import Q
 from django.utils import timezone
@@ -48,7 +50,7 @@ def _send(user, text: str, keyboard: dict | None = None) -> bool:
 def daily_digest_text(user) -> tuple[str, int]:
     _sync_user_cases(user)
     now = timezone.now()
-    end = now + timezone.timedelta(hours=24)
+    end = now + timedelta(hours=24)
     actions = (
         CaseAction.objects.filter(
             case__tenant__memberships__user=user,
