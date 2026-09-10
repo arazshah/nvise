@@ -12,6 +12,7 @@ from apps.intelligence.models import (
     FactEvidence,
 )
 from apps.intelligence.question_planner import plan_question
+from apps.intelligence.services import apply_extraction_response
 from apps.messaging.models import CaseMessage
 from apps.tenants.models import Tenant, TenantMembership
 
@@ -128,3 +129,62 @@ def test_noncritical_missing_field_is_suppressed_by_hint():
     assert plan.category == "skip"
     assert plan.should_ask is False
     assert "ضروری نیست" in plan.explanation
+
+
+@pytest.mark.django_db
+def test_extraction_decision_gap_becomes_source_aware_expert_question():
+    user, case, schema, run = _case_and_run("planner-expert")
+    field = schema.fields.get(key="incident_cause")
+    message = CaseMessage.objects.create(
+        user=user,
+        case=case,
+        assignment_status=CaseMessage.AssignmentStatus.ASSIGNED,
+        provider="bale",
+        external_chat_id="300",
+        external_message_id="400",
+        message_type=CaseMessage.MessageType.DOCUMENT,
+    )
+    evidence = Evidence.objects.create(
+        case=case,
+        source_kind=Evidence.SourceKind.DOCUMENT_PAGE,
+        message=message,
+        text="در گزارش بازدید به خوردگی بدنه مخزن اشاره شده است.",
+        metadata={"filename": "inspection.pdf", "page": 3},
+    )
+
+    apply_extraction_response(
+        run=run,
+        response={
+            "facts": [
+                {
+                    "field": "incident_cause",
+                    "value": "خوردگی بدنه مخزن",
+                    "confidence": 0.91,
+                    "evidence_ids": [str(evidence.id)],
+                }
+            ],
+            "conflicts": [],
+            "decision_gaps": [
+                {
+                    "field": "incident_cause",
+                    "rationale": "نوع فنی مخزن برای تفسیر علت و بررسی انطباق با پوشش اهمیت دارد.",
+                    "prompt": "آیا بر اساس مشخصات فنی موجود، این مخزن اتمسفریک بوده یا تحت فشار؟",
+                    "importance": "high",
+                    "evidence_ids": [str(evidence.id)],
+                }
+            ],
+        },
+    )
+
+    issue = CaseFieldIssue.objects.get(
+        case=case,
+        field=field,
+        issue_type=CaseFieldIssue.IssueType.EXPERT_JUDGMENT,
+    )
+    plan = plan_question(issue)
+
+    assert plan.category == "expert_judgment"
+    assert plan.should_ask is True
+    assert "نوع فنی مخزن" in plan.explanation
+    assert "اتمسفریک" in plan.prompt
+    assert any("inspection.pdf" in source for source in plan.sources)
