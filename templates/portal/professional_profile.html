@@ -13,7 +13,7 @@
   <div class="top"><strong>نویسه</strong><a href="/review/dashboard/">بازگشت به داشبورد ←</a></div>
   <section class="hero">
     <h1>👤 پروفایل حرفه‌ای</h1>
-    <div class="muted">نویسه بر اساس حرفه، تخصص و نوع پرونده شما نحوه خواندن مدارک، سؤال‌های تکمیلی و چارچوب تحلیل را تنظیم می‌کند. این انتخاب را هر زمان لازم باشد می‌توانید تغییر دهید.</div>
+    <div class="muted">نویسه بر اساس حرفه، تخصص و نوع هر پرونده، نحوه خواندن مدارک، پرسش‌های تکمیلی، محورهای بررسی و ساختار گزارش را تنظیم می‌کند. این انتخاب را هر زمان لازم باشد می‌توانید تغییر دهید.</div>
   </section>
   <div class="grid">
     <section class="card">
@@ -31,7 +31,7 @@
         </select>
         <button type="submit">ذخیره پروفایل حرفه‌ای</button>
       </form>
-      <div class="hint">اگر حرفه را تغییر می‌دهید، ابتدا آن را ذخیره کنید؛ سپس تخصص‌ها و نوع پرونده‌های متناسب با همان حرفه نمایش داده می‌شوند.</div>
+      <div class="hint">با انتخاب حرفه و تخصص، نویسه موضوعات متناسب با کار شما را پیشنهاد می‌کند. این انتخاب مستقیماً روی نوع بررسی مدارک، پرسش‌های تخصصی و ساختار گزارش اثر می‌گذارد.</div>
     </section>
     <section class="card">
       <h2>۲) نوع پرونده</h2>
@@ -40,7 +40,7 @@
           {% for case in cases %}
           <div class="case">
             <strong>{{ case.title|default:case.case_code }}</strong><br>
-            <span class="badge">{{ case.case_type_key|default:"نوع پرونده انتخاب نشده" }}</span>
+            {% if case.case_type_key %}<span class="badge">{% for item in case_types %}{% if item.key == case.case_type_key %}{{ item.label }}{% endif %}{% endfor %}</span>{% else %}<span class="badge">نوع پرونده انتخاب نشده</span>{% endif %}
             <form method="post">{% csrf_token %}<input type="hidden" name="action" value="case_type"><input type="hidden" name="case_code" value="{{ case.case_code }}">
               <label>نوع این پرونده</label>
               <select name="case_type" required>
