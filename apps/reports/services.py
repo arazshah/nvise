@@ -89,6 +89,23 @@ def _report_limitations(case: Case) -> list[dict]:
     ]
 
 
+def _limitation_section_data(limitations: list[dict]) -> dict:
+    data = {}
+    for index, item in enumerate(limitations, start=1):
+        value_parts = [item["issue_type_label"], item["resolution_label"]]
+        note = item.get("resolution_note", "").strip()
+        if note:
+            value_parts.append(note)
+        data[f"limitation_{index}"] = {
+            "label": item["field_label"],
+            "value": " — ".join(value_parts),
+            "field_key": item["field_key"],
+            "issue_type": item["issue_type"],
+            "resolution_status": item["resolution_status"],
+        }
+    return data
+
+
 @transaction.atomic
 def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
     locked_case = Case.objects.select_for_update().select_related("created_by").get(pk=case.pk)
@@ -143,7 +160,7 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
         created_by=created_by,
     )
 
-    fact_data = {key: value for key, value in facts.items()}
+    limitation_data = _limitation_section_data(limitations)
     for sequence, section in enumerate(composed["sections"]):
         ReportSection.objects.create(
             revision=revision,
@@ -151,7 +168,7 @@ def generate_report_revision(*, case: Case, created_by=None) -> ReportRevision:
             title=section["title"],
             sequence=sequence,
             content=section["content"],
-            data=fact_data if sequence == 0 else {},
+            data=limitation_data if section["key"] == "limitations" else {},
         )
 
     report.current_revision = revision
