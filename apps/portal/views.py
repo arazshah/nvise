@@ -1,3 +1,4 @@
+from datetime import datetime, time, timedelta
 from io import BytesIO
 
 from django.contrib import messages
@@ -488,16 +489,16 @@ def today_view(request):
 
     now = timezone.now()
     local_today = timezone.localdate()
-    tomorrow = local_today + __import__("datetime").timedelta(days=1)
+    tomorrow = local_today + timedelta(days=1)
     tomorrow_start = timezone.make_aware(
-        __import__("datetime").datetime.combine(tomorrow, __import__("datetime").time.min),
+        datetime.combine(tomorrow, time.min),
         timezone.get_current_timezone(),
     )
     today_start = timezone.make_aware(
-        __import__("datetime").datetime.combine(local_today, __import__("datetime").time.min),
+        datetime.combine(local_today, time.min),
         timezone.get_current_timezone(),
     )
-    week_end = tomorrow_start + __import__("datetime").timedelta(days=7)
+    week_end = tomorrow_start + timedelta(days=7)
 
     actions = CaseAction.objects.filter(
         case__in=accessible,
