@@ -72,10 +72,16 @@ def extract_case_facts(self, run_id: str) -> None:
             .select_related("case__tenant", "case__created_by", "schema__sub_vertical__vertical")
             .get(pk=run_id)
         )
-        if run.status == ExtractionRun.Status.COMPLETED:
+        if run.status in {ExtractionRun.Status.COMPLETED, ExtractionRun.Status.RUNNING}:
             return
         if _case_evidence_pipeline_pending(run.case):
-            raise RuntimeError("Case evidence is still being processed")
+            # Waiting for document/image/audio processing is an orchestration state,
+            # not an extraction failure. Content jobs resume this run on completion.
+            run.status = ExtractionRun.Status.PENDING
+            run.error_message = ""
+            run.save(update_fields=["status", "error_message"])
+            Case.objects.filter(pk=run.case_id).update(analysis_status=Case.AnalysisStatus.QUEUED)
+            return
         try:
             assert_quota(run.case.tenant, UsageRecord.Metric.AI_EXTRACTION, 1)
         except QuotaExceededError as exc:
