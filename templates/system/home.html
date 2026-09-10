@@ -3,104 +3,154 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="نویسه؛ سامانه هوشمند پرونده‌محور برای نگهداری صوت، تصویر، مدارک و یادداشت‌ها، تحلیل اختیاری و تولید گزارش حرفه‌ای قابل بررسی.">
-  <title>نویسه | پرونده، مدرک، تحلیل و گزارش در یک مسیر</title>
+  <meta name="description" content="نویسه؛ دستیار هوشمند پرونده‌های تخصصی برای وکلا، کارشناسان رسمی، ارزیابان خسارت، بازرسان، مشاوران و حرفه‌ای‌هایی که با اسناد، صوت، تصویر، تحلیل و گزارش سروکار دارند.">
+  <title>نویسه | دستیار هوشمند پرونده‌های تخصصی</title>
   <link rel="icon" href="/favicon.ico">
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
   <style>
-    :root{--bg:#07111f;--panel:#0d1b2d;--soft:#12243a;--text:#f7fbff;--muted:#a9b7c9;--green:#2bd6a4;--blue:#748cff;--line:rgba(255,255,255,.09);--gold:#f0c776;--radius:24px;--shadow:0 24px 70px rgba(0,0,0,.28)}
-    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Vazirmatn,Tahoma,sans-serif;background:radial-gradient(circle at 12% 0,rgba(116,140,255,.14),transparent 28%),radial-gradient(circle at 88% 5%,rgba(43,214,164,.12),transparent 24%),var(--bg);color:var(--text);line-height:1.95}a{color:inherit;text-decoration:none}.container{width:min(1180px,calc(100% - 32px));margin:auto}.nav{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:19px 0}.brand{display:flex;align-items:center;gap:11px;font-size:20px;font-weight:900}.logo{width:43px;height:43px;border-radius:14px;background:linear-gradient(135deg,var(--green),var(--blue));display:grid;place-items:center;color:#07111f}.brand small{display:block;font-size:11px;color:var(--muted);font-weight:500;line-height:1.2}.navlinks{display:flex;align-items:center;gap:17px;color:var(--muted);font-size:14px}.navlinks a:hover{color:#fff}.nav-cta{padding:9px 14px;border:1px solid rgba(43,214,164,.25);border-radius:11px;color:var(--green)!important;background:rgba(43,214,164,.06)}
-    .hero{padding:64px 0 72px;display:grid;grid-template-columns:1.04fr .96fr;gap:40px;align-items:center}.eyebrow{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(43,214,164,.25);background:rgba(43,214,164,.07);color:var(--green);border-radius:999px;padding:7px 12px;font-size:13px}.hero h1{font-size:clamp(2.5rem,6vw,5rem);line-height:1.2;letter-spacing:-1.6px;margin:18px 0}.grad{background:linear-gradient(90deg,var(--green),var(--blue));-webkit-background-clip:text;color:transparent}.lead{font-size:18px;color:var(--muted);max-width:720px}.actions{display:flex;flex-wrap:wrap;gap:11px;margin-top:27px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 19px;border-radius:13px;border:1px solid var(--line);font-weight:800;transition:.2s}.btn:hover{transform:translateY(-2px)}.primary{background:linear-gradient(135deg,var(--green),#27c493);color:#05120f;border:0}.secondary{background:rgba(255,255,255,.035)}.micro{color:#8494aa;font-size:12px;margin-top:12px}
-    .mock{background:linear-gradient(145deg,rgba(255,255,255,.1),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:30px;padding:12px;box-shadow:var(--shadow)}.phone{background:#eff3f8;border-radius:23px;color:#172033;padding:18px;min-height:475px;position:relative;overflow:hidden}.phone-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #dfe5ee;padding-bottom:13px;font-weight:900}.bubble{background:#fff;border-radius:17px;padding:13px 15px;margin:15px 0;box-shadow:0 6px 20px rgba(28,39,70,.08);font-size:13px;line-height:1.8}.bubble.bot{background:#e8fbf4;margin-left:34px}.bubble.user{margin-right:42px}.keys{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:15px}.key{background:#fff;border:1px solid #dde4ee;border-radius:11px;padding:9px;text-align:center;font-size:12px;font-weight:800}.key.full{grid-column:1/-1}.panel-chip{position:absolute;left:18px;bottom:18px;background:#172033;color:#fff;border-radius:14px;padding:11px 14px;font-size:12px;box-shadow:0 10px 28px rgba(0,0,0,.18)}
-    section{padding:72px 0}.head{margin-bottom:25px}.head h2{font-size:clamp(1.9rem,4vw,3rem);margin:0 0 8px}.head p{margin:0;color:var(--muted);max-width:800px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{background:rgba(13,27,45,.78);border:1px solid var(--line);border-radius:var(--radius);padding:23px}.card .ico{font-size:27px;margin-bottom:13px}.card h3{margin:0 0 7px}.card p{color:var(--muted);margin:0;font-size:14px}.flow{display:grid;gap:11px}.flow-row{display:grid;grid-template-columns:48px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);background:rgba(255,255,255,.027);padding:16px;border-radius:17px}.step{width:42px;height:42px;border-radius:13px;background:rgba(116,140,255,.13);display:grid;place-items:center;color:#aebaff;font-weight:900}.flow-row strong{display:block}.flow-row span{color:var(--muted);font-size:13px}.arrow{color:var(--green)}
-    .split{display:grid;grid-template-columns:1fr 1fr;gap:18px}.featurebox{border-radius:27px;border:1px solid var(--line);background:linear-gradient(145deg,rgba(43,214,164,.08),rgba(116,140,255,.06));padding:27px}.featurebox h2{margin-top:0}.list{display:grid;gap:10px}.item{display:flex;gap:11px;align-items:flex-start;background:rgba(255,255,255,.035);padding:13px;border-radius:14px}.item i{font-style:normal}.item span{color:var(--muted);font-size:13px}.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.plan{border:1px solid var(--line);background:rgba(13,27,45,.72);border-radius:22px;padding:22px}.plan h3{margin:0 0 5px}.price{font-size:26px;font-weight:900;margin:13px 0}.price small{font-size:12px;color:var(--muted);font-weight:500}.plan ul{padding:0 18px 0 0;color:var(--muted);font-size:13px}.note{border:1px solid rgba(240,199,118,.22);background:rgba(240,199,118,.06);color:#f3dcae;border-radius:15px;padding:13px 16px;margin-top:16px;font-size:13px}
-    .creator{display:flex;align-items:center;justify-content:space-between;gap:22px;background:linear-gradient(135deg,rgba(116,140,255,.12),rgba(43,214,164,.09));border:1px solid var(--line);padding:27px;border-radius:27px}.creator p{color:var(--muted);margin:6px 0 0}.support{display:flex;gap:10px;flex-wrap:wrap}.pill{padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.035)}footer{border-top:1px solid var(--line);padding:27px 0 42px;color:var(--muted);font-size:12px}.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
-    @media(max-width:900px){.hero,.split{grid-template-columns:1fr}.grid3,.plans{grid-template-columns:1fr}.navlinks{display:none}.hero{padding-top:34px}.creator{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.keys{grid-template-columns:1fr}.key.full{grid-column:auto}.flow-row{grid-template-columns:42px 1fr}.arrow{display:none}.actions .btn{width:100%}.phone{min-height:430px}.creator{padding:20px}}
+    :root{
+      --bg:#07101c;--bg2:#0a1525;--panel:#0d1b2d;--panel2:#101f33;--text:#f7fbff;--muted:#9fb0c5;
+      --green:#2bd6a4;--blue:#788dff;--cyan:#6fe6d0;--gold:#efc875;--line:rgba(255,255,255,.09);
+      --shadow:0 24px 80px rgba(0,0,0,.34);--radius:26px
+    }
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Vazirmatn,Tahoma,sans-serif;background:
+      radial-gradient(circle at 10% 0,rgba(120,141,255,.18),transparent 28%),
+      radial-gradient(circle at 90% 7%,rgba(43,214,164,.13),transparent 24%),
+      linear-gradient(180deg,var(--bg),#091421 55%,#07101b);color:var(--text);line-height:1.95}
+    a{color:inherit;text-decoration:none}.container{width:min(1200px,calc(100% - 32px));margin:auto}
+    .nav{height:82px;display:flex;align-items:center;justify-content:space-between;gap:22px}.brand{display:flex;align-items:center;gap:11px;font-size:21px;font-weight:900}.logo{width:44px;height:44px;border-radius:15px;background:linear-gradient(135deg,var(--green),var(--blue));display:grid;place-items:center;color:#04120e;box-shadow:0 10px 30px rgba(43,214,164,.18)}.brand small{display:block;color:#8092a9;font-size:10px;font-weight:500;line-height:1.2}.navlinks{display:flex;gap:20px;align-items:center;color:#a8b6c8;font-size:13px}.navlinks a:hover{color:#fff}.nav-cta{background:rgba(43,214,164,.1);border:1px solid rgba(43,214,164,.25);color:#65e5bf!important;padding:10px 15px;border-radius:12px;font-weight:800}
+    .hero{min-height:690px;display:grid;grid-template-columns:1.08fr .92fr;gap:50px;align-items:center;padding:60px 0 80px}.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid rgba(43,214,164,.25);background:rgba(43,214,164,.06);color:#6fe4c2;border-radius:999px;font-size:12px;font-weight:700}.dot{width:8px;height:8px;background:var(--green);border-radius:50%;box-shadow:0 0 16px var(--green)}
+    h1{font-size:clamp(2.65rem,5.9vw,5.2rem);line-height:1.17;letter-spacing:-1.8px;margin:20px 0 17px}.grad{background:linear-gradient(90deg,var(--green),#89a0ff);-webkit-background-clip:text;color:transparent}.lead{font-size:18px;color:#aebccf;max-width:760px;margin:0}.lead strong{color:#fff}.actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:28px}.btn{min-height:52px;padding:0 20px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:900;border:1px solid var(--line);transition:.2s}.btn:hover{transform:translateY(-2px)}.primary{background:linear-gradient(135deg,var(--green),#22c997);color:#04110e;border:0;box-shadow:0 15px 40px rgba(43,214,164,.18)}.secondary{background:rgba(255,255,255,.035)}.micro{margin-top:13px;color:#7f90a6;font-size:12px}
+    .trustbar{display:flex;gap:9px;flex-wrap:wrap;margin-top:28px}.trust{padding:7px 10px;border:1px solid var(--line);border-radius:999px;color:#a8b7c9;background:rgba(255,255,255,.025);font-size:11px}
+    .product{position:relative}.glow{position:absolute;inset:7% 10%;background:radial-gradient(circle,rgba(120,141,255,.23),transparent 60%);filter:blur(28px)}.window{position:relative;border:1px solid rgba(255,255,255,.13);border-radius:30px;background:linear-gradient(145deg,rgba(255,255,255,.09),rgba(255,255,255,.02));padding:12px;box-shadow:var(--shadow);transform:perspective(1100px) rotateY(-4deg) rotateX(1deg)}.app{background:#f3f6fa;color:#162032;border-radius:22px;overflow:hidden;min-height:510px}.apphead{height:58px;padding:0 17px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid #e2e7ef;font-weight:900}.appbody{display:grid;grid-template-columns:120px 1fr;min-height:452px}.side{background:#111c2d;color:#fff;padding:15px 10px}.side div{padding:9px;border-radius:9px;font-size:10px;color:#aab8c9;margin-bottom:5px}.side .active{background:#26354d;color:#fff}.content{padding:17px}.case-title{font-weight:900;font-size:18px}.case-sub{font-size:11px;color:#758195;margin-top:2px}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:15px 0}.kpi{background:#fff;border:1px solid #e4e9f1;border-radius:12px;padding:11px}.kpi b{display:block;font-size:18px}.kpi span{font-size:9px;color:#7b8799}.timeline{background:#fff;border:1px solid #e4e9f1;border-radius:15px;padding:13px}.row{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #edf0f4}.row:last-child{border-bottom:0}.ri{width:30px;height:30px;border-radius:9px;background:#eef2ff;display:grid;place-items:center;flex:0 0 auto}.rt b{font-size:11px;display:block}.rt span{font-size:9px;color:#778397}.result{margin-top:12px;background:linear-gradient(135deg,#172338,#24355a);border-radius:14px;color:#fff;padding:13px;font-size:10px}.result strong{display:block;font-size:12px;margin-bottom:4px}.result span{color:#c8d4e4}
+    section{padding:82px 0}.head{max-width:820px;margin-bottom:28px}.head.center{text-align:center;margin-left:auto;margin-right:auto}.head h2{font-size:clamp(2rem,4.3vw,3.4rem);line-height:1.35;margin:0 0 10px}.head p{color:var(--muted);margin:0}.accent{color:var(--green)}
+    .segments{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.segment{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(15,31,51,.96),rgba(11,24,41,.92));border:1px solid var(--line);border-radius:24px;padding:24px;min-height:235px}.segment:before{content:"";position:absolute;width:140px;height:140px;border-radius:50%;background:rgba(120,141,255,.07);left:-40px;top:-50px}.segment .ico{font-size:31px;margin-bottom:14px;position:relative}.segment h3{margin:0 0 8px;font-size:19px}.segment p{margin:0;color:var(--muted);font-size:13px}.segment .fit{display:inline-block;margin-top:14px;font-size:11px;color:#75e2c1;background:rgba(43,214,164,.07);border:1px solid rgba(43,214,164,.16);padding:5px 8px;border-radius:999px}
+    .value-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.value{background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:20px;padding:20px}.value .num{font-size:11px;color:#7f91a9;margin-bottom:13px}.value h3{margin:0 0 7px;font-size:16px}.value p{margin:0;color:var(--muted);font-size:12px}
+    .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.flow-item{border-radius:22px;padding:22px;background:linear-gradient(180deg,rgba(120,141,255,.08),rgba(255,255,255,.02));border:1px solid var(--line)}.flow-item b{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:rgba(120,141,255,.15);color:#aebaff;margin-bottom:15px}.flow-item h3{font-size:16px;margin:0 0 6px}.flow-item p{font-size:12px;color:var(--muted);margin:0}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}.featurebox{border:1px solid var(--line);border-radius:26px;background:linear-gradient(145deg,rgba(43,214,164,.08),rgba(120,141,255,.05));padding:26px}.featurebox h3{font-size:22px;margin:0 0 10px}.featurebox p{color:var(--muted);font-size:13px}.checklist{display:grid;gap:9px;margin-top:18px}.check{display:flex;gap:9px;align-items:flex-start;background:rgba(255,255,255,.035);padding:11px 12px;border-radius:13px;font-size:12px;color:#c5d0de}.check i{font-style:normal;color:var(--green)}
+    .trial{border:1px solid rgba(43,214,164,.25);background:linear-gradient(135deg,rgba(43,214,164,.10),rgba(120,141,255,.08));border-radius:30px;padding:34px;display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center}.trial h2{margin:0 0 8px;font-size:clamp(1.9rem,4vw,3rem)}.trial p{margin:0;color:#afbed0}.trial .btn{min-width:210px}
+    .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.plan{position:relative;border:1px solid var(--line);background:rgba(13,27,45,.85);border-radius:23px;padding:23px}.plan.featured{border-color:rgba(43,214,164,.35);box-shadow:0 18px 45px rgba(43,214,164,.06)}.ribbon{position:absolute;top:14px;left:14px;font-size:10px;color:#06130f;background:var(--green);padding:4px 8px;border-radius:999px;font-weight:900}.plan h3{margin:0}.price{font-size:27px;font-weight:900;margin:13px 0}.price small{font-size:11px;color:var(--muted);font-weight:500}.plan ul{padding-right:18px;color:var(--muted);font-size:12px;line-height:2.1}.plan .mini{margin-top:13px;color:#90a1b6;font-size:11px}
+    .creator{display:flex;justify-content:space-between;gap:22px;align-items:center;border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:24px;padding:24px}.creator h3{margin:0}.creator p{margin:5px 0 0;color:var(--muted);font-size:12px}.creatorlinks{display:flex;gap:9px;flex-wrap:wrap}.pill{border:1px solid var(--line);border-radius:12px;padding:9px 13px;background:rgba(255,255,255,.025);font-size:12px}
+    footer{border-top:1px solid var(--line);padding:28px 0 42px;color:#8292a6;font-size:11px}.foot{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+    @media(max-width:980px){.hero{grid-template-columns:1fr;min-height:auto;padding-top:35px}.window{transform:none}.segments{grid-template-columns:1fr 1fr}.value-grid,.flow{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}.trial{grid-template-columns:1fr}.plans{grid-template-columns:1fr}.navlinks{display:none}}
+    @media(max-width:620px){h1{font-size:2.55rem;letter-spacing:-1px}.segments,.value-grid,.flow{grid-template-columns:1fr}.appbody{grid-template-columns:1fr}.side{display:none}.actions .btn{width:100%}.trial{padding:24px}.creator{flex-direction:column;align-items:flex-start}.hero{padding-bottom:48px}.trustbar{gap:6px}.segment{min-height:auto}}
   </style>
 </head>
 <body>
 <header class="container">
   <nav class="nav">
-    <a class="brand" href="/"><span class="logo">ن</span><span>نویسه<small>Nvise · Smart Case Workspace</small></span></a>
+    <a class="brand" href="/"><span class="logo">ن</span><span>نویسه<small>Nvise · Professional Case Intelligence</small></span></a>
     <div class="navlinks">
-      <a href="#workflow">نحوه کار</a>
-      <a href="#features">قابلیت‌ها</a>
-      <a href="/guide/">راهنمای کامل</a>
+      <a href="#for-whom">برای چه کسانی؟</a>
+      <a href="#workflow">چطور کار می‌کند؟</a>
+      <a href="/guide/">راهنما</a>
       {% if show_billing_portal %}<a href="#plans">پلن‌ها</a>{% endif %}
-      {% if bale_public_url %}<a class="nav-cta" href="{{ bale_public_url }}" target="_blank" rel="noopener">شروع در بله</a>{% endif %}
+      {% if bale_public_url %}<a class="nav-cta" href="{{ bale_public_url }}" target="_blank" rel="noopener">۳۰ روز رایگان شروع کنید</a>{% endif %}
     </div>
   </nav>
 </header>
+
 <main>
   <section class="container hero">
     <div>
-      <span class="eyebrow">● پرونده‌محور، امن و قابل بازبینی</span>
-      <h1>پرونده‌ات را نگه دار؛<br><span class="grad">هر وقت خواستی تحلیلش کن.</span></h1>
-      <p class="lead">نویسه فقط یک «تولیدکننده گزارش» نیست. هر پرونده یک مخزن واقعی برای صوت، تصویر، مدرک و یادداشت است. می‌توانید مدت‌ها فقط اطلاعات را جمع کنید، بعد در زمان مناسب تحلیل را شروع کنید، ابهام‌ها را مدیریت کنید و در صورت نیاز گزارش حرفه‌ای بسازید.</p>
+      <span class="eyebrow"><span class="dot"></span> دستیار هوشمند پرونده‌های تخصصی</span>
+      <h1>از اطلاعات پراکنده<br>تا <span class="grad">گزارش حرفه‌ای و قابل اتکا</span></h1>
+      <p class="lead">نویسه برای <strong>وکلا، کارشناسان رسمی، ارزیابان خسارت، بازرسان، مشاوران و حرفه‌ای‌هایی</strong> ساخته شده که هر روز با صوت، تصویر، اسناد، یادداشت و گزارش سروکار دارند. همه چیز را در یک پرونده منظم نگه دارید، اطلاعات مهم را سریع‌تر پیدا کنید، ابهام‌ها را ببینید و گزارش تخصصی خود را با کمک هوش مصنوعی آماده کنید.</p>
       <div class="actions">
-        {% if bale_public_url %}<a class="btn primary" href="{{ bale_public_url }}" target="_blank" rel="noopener">💬 شروع در ربات بله</a>{% else %}<a class="btn primary" href="/guide/">📘 مشاهده راهنمای شروع</a>{% endif %}
-        <a class="btn secondary" href="/guide/">راهنمای کامل نویسه</a>
+        {% if bale_public_url %}<a class="btn primary" href="{{ bale_public_url }}" target="_blank" rel="noopener">🚀 شروع رایگان ۳۰ روزه در بله</a>{% else %}<a class="btn primary" href="/guide/">📘 راهنمای شروع</a>{% endif %}
+        <a class="btn secondary" href="#for-whom">ببینید نویسه برای شماست یا نه</a>
       </div>
-      <div class="micro">بدون نیاز به حفظ دستور؛ مسیر اصلی با دکمه‌های فارسی انجام می‌شود.</div>
+      <div class="trustbar">
+        <span class="trust">🔐 پرونده‌های خصوصی</span><span class="trust">🎙 صوت و تبدیل به متن</span><span class="trust">🧠 تحلیل هوشمند</span><span class="trust">📄 گزارش قابل بررسی</span><span class="trust">🌐 پنل وب + بله</span>
+      </div>
+      <div class="micro">بدون نیاز به نصب نرم‌افزار پیچیده؛ از بله شروع کنید و در پنل وب ادامه دهید.</div>
     </div>
-    <div class="mock" aria-label="نمونه تجربه نویسه در بله">
-      <div class="phone">
-        <div class="phone-head"><span>نویسه</span><span>● آنلاین</span></div>
-        <div class="bubble bot">پرونده فعال شما آماده است. می‌توانید متن، صوت، تصویر یا مدرک بفرستید و هر زمان خواستید تحلیل را شروع کنید.</div>
-        <div class="bubble user">🎙 یک پیام صوتی و قرارداد را به پرونده اضافه کردم.</div>
-        <div class="bubble bot">✅ اطلاعات ذخیره شد. تحلیل اجباری نیست و پرونده می‌تواند فقط به‌عنوان مخزن باقی بماند.</div>
-        <div class="keys">
-          <div class="key">🧠 تحلیل پرونده</div><div class="key">📂 پرونده‌های من</div>
-          <div class="key">➕ پرونده جدید</div><div class="key">📊 وضعیت پرونده</div>
-          <div class="key full">🌐 ورود امن به پنل نویسه</div>
+
+    <div class="product" aria-label="نمایی از پرونده در نویسه">
+      <div class="glow"></div>
+      <div class="window"><div class="app">
+        <div class="apphead"><span>نویسه · پرونده تخصصی</span><span>● آماده بررسی</span></div>
+        <div class="appbody">
+          <aside class="side"><div class="active">📁 پرونده</div><div>📎 مدارک</div><div>🎙 صوت‌ها</div><div>🧠 تحلیل</div><div>📄 گزارش</div></aside>
+          <div class="content">
+            <div class="case-title">پرونده ارزیابی خسارت ساختمان</div><div class="case-sub">همه مدارک، صوت‌ها، تصاویر و یادداشت‌ها در یک جریان</div>
+            <div class="kpis"><div class="kpi"><b>۲۳</b><span>مدرک و یادداشت</span></div><div class="kpi"><b>۴</b><span>فایل صوتی</span></div><div class="kpi"><b>۳</b><span>مورد نیازمند بررسی</span></div></div>
+            <div class="timeline">
+              <div class="row"><div class="ri">🎙</div><div class="rt"><b>توضیحات بازدید میدانی</b><span>متن صوت استخراج و به پرونده افزوده شد</span></div></div>
+              <div class="row"><div class="ri">🖼</div><div class="rt"><b>تصاویر محل خسارت</b><span>۶ تصویر در پرونده ثبت شده است</span></div></div>
+              <div class="row"><div class="ri">📄</div><div class="rt"><b>بیمه‌نامه و مستندات</b><span>اطلاعات اصلی برای تحلیل آماده است</span></div></div>
+            </div>
+            <div class="result"><strong>🧠 جمع‌بندی هوشمند آماده است</strong><span>اطلاعات کلیدی استخراج شده؛ ۳ مورد نیازمند تصمیم شماست. پس از بررسی، گزارش تخصصی قابل تولید است.</span></div>
+          </div>
         </div>
-        <div class="panel-chip">🔐 ورود یک‌بارمصرف به پنل وب</div>
-      </div>
+      </div></div>
     </div>
   </section>
 
-  <section id="workflow"><div class="container">
-    <div class="head"><h2>مسیر واقعی کار در نویسه</h2><p>جریان جدید طوری طراحی شده که کاربر هیچ‌وقت در یک پرونده گیر نکند و تحلیل، گزارش و بایگانی تصمیم‌های مستقل باشند.</p></div>
-    <div class="flow">
-      <div class="flow-row"><div class="step">01</div><div><strong>ساخت یا انتخاب پرونده</strong><span>از منوی بله پرونده جدید بسازید یا یکی از پرونده‌های قبلی را فعال کنید.</span></div><div class="arrow">←</div></div>
-      <div class="flow-row"><div class="step">02</div><div><strong>جمع‌آوری محتوا</strong><span>متن، Voice، فایل، تصویر و یادداشت داخل مخزن دائمی همان پرونده ذخیره می‌شود.</span></div><div class="arrow">←</div></div>
-      <div class="flow-row"><div class="step">03</div><div><strong>تحلیل فقط وقتی شما بخواهید</strong><span>با «🧠 تحلیل پرونده» اطلاعات قابل استفاده، کمبودها و تناقض‌ها استخراج می‌شوند.</span></div><div class="arrow">←</div></div>
-      <div class="flow-row"><div class="step">04</div><div><strong>اول نتیجه، بعد تصمیم</strong><span>قبل از هر سؤال یا گزارش، خلاصه تحلیل نمایش داده می‌شود؛ رفع موارد، افزودن مدرک یا ادامه با اطلاعات فعلی انتخاب شماست.</span></div><div class="arrow">←</div></div>
-      <div class="flow-row"><div class="step">05</div><div><strong>گزارش قابل بررسی و شفاف</strong><span>گزارش فقط با تصمیم صریح شما ساخته می‌شود و موارد نامشخص/در دسترس‌نبوده نیز داخل آن ثبت می‌شوند.</span></div><div class="arrow">←</div></div>
-      <div class="flow-row"><div class="step">06</div><div><strong>پنل وب، بایگانی و بازگشایی</strong><span>با Magic Link یک‌بارمصرف وارد Dashboard شوید، مخزن و گزارش را ببینید، پرونده را بایگانی یا دوباره باز کنید.</span></div></div>
+  <section id="for-whom"><div class="container">
+    <div class="head center"><h2>اگر کار شما با <span class="accent">پرونده، مدرک و گزارش</span> گره خورده، نویسه برای شما ساخته شده</h2><p>نویسه یک ابزار عمومی یادداشت‌برداری نیست؛ برای کار حرفه‌ای و پرونده‌محور طراحی شده، جایی که اطلاعات باید منظم، قابل پیگیری و در نهایت قابل ارائه باشند.</p></div>
+    <div class="segments">
+      <article class="segment"><div class="ico">⚖️</div><h3>وکلا و دفاتر حقوقی</h3><p>مکالمات، مستندات، تصاویر، یادداشت جلسات و مدارک هر موکل را در یک پرونده نگه دارید و برای مرور، تحلیل و تهیه جمع‌بندی آماده کنید.</p><span class="fit">پرونده حقوقی · موکل · مستندات</span></article>
+      <article class="segment"><div class="ico">🧾</div><h3>کارشناسان رسمی</h3><p>اطلاعات بازدید، مستندات طرفین، فایل‌های صوتی و یافته‌های فنی را یکجا جمع کنید و مسیر تهیه گزارش کارشناسی را منظم‌تر پیش ببرید.</p><span class="fit">بازدید · مستندات · گزارش کارشناسی</span></article>
+      <article class="segment"><div class="ico">🛡️</div><h3>کارشناسان بیمه و ارزیابان خسارت</h3><p>از اعلام خسارت و تصاویر محل تا اظهارات، اسناد و تحلیل، همه اجزای پرونده را یکپارچه کنید و گزارش ارزیابی را سریع‌تر آماده کنید.</p><span class="fit">خسارت · ارزیابی · گزارش</span></article>
+      <article class="segment"><div class="ico">🏗️</div><h3>مشاوران فنی و مهندسی</h3><p>بازدیدهای پروژه، صورت‌جلسه‌ها، عکس‌ها، فایل‌های فنی و توضیحات شفاهی را به پرونده‌های قابل رجوع و گزارش تبدیل کنید.</p><span class="fit">پروژه · بازدید · صورت‌جلسه</span></article>
+      <article class="segment"><div class="ico">🔍</div><h3>بازرسان، حسابرسان و ارزیابان</h3><p>شواهد، مصاحبه‌ها، چک‌لیست‌ها و مدارک بررسی را در کنار هم نگه دارید تا هیچ نکته‌ای میان فایل‌ها و پیام‌ها گم نشود.</p><span class="fit">بازرسی · شواهد · یافته‌ها</span></article>
+      <article class="segment"><div class="ico">🏢</div><h3>ارزیابان ملک و مشاوران تخصصی</h3><p>تصاویر، مدارک مالکیت، توضیحات بازدید، مستندات و یادداشت‌های تخصصی را برای هر موضوع در یک فضای منظم مدیریت کنید.</p><span class="fit">ارزیابی · مستندات · جمع‌بندی</span></article>
     </div>
   </div></section>
 
-  <section id="features"><div class="container">
-    <div class="head"><h2>یک پرونده، یک فضای کاری کامل</h2><p>بله برای ثبت سریع اطلاعات و تصمیم‌های روزمره است؛ پنل وب برای مرور دقیق، آرشیو، تحلیل و گزارش.</p></div>
-    <div class="grid3">
-      <div class="card"><div class="ico">📁</div><h3>مخزن واقعی پرونده</h3><p>صوت، تصویر، مدرک، یادداشت، transcript، تحلیل و گزارش در context همان پرونده باقی می‌مانند.</p></div>
-      <div class="card"><div class="ico">🧠</div><h3>تحلیل کنترل‌شده</h3><p>تحلیل اجباری نیست. نتیجه ابتدا خلاصه می‌شود و سیستم بدون تصمیم شما وارد چرخه سؤال یا تولید گزارش نمی‌شود.</p></div>
-      <div class="card"><div class="ico">🧩</div><h3>ابهام بدون حلقه تکرار</h3><p>دلیل ابهام و پاسخ قبلی نمایش داده می‌شود؛ «اطلاعات در دسترس نیست» و «ادامه با اطلاعات فعلی» پایان رسمی مسئله‌اند.</p></div>
-      <div class="card"><div class="ico">📑</div><h3>گزارش با محدودیت‌های شفاف</h3><p>حتی با اطلاعات ناقص می‌توان گزارش ساخت؛ موارد نامشخص در بخش مستقل گزارش و DOCX ثبت می‌شوند.</p></div>
-      <div class="card"><div class="ico">🔐</div><h3>ورود امن از بله</h3><p>Magic Link کوتاه‌عمر و یک‌بارمصرف، بدون نیاز به حفظ نام کاربری یا رمز عبور برای دسترسی به پنل شخصی.</p></div>
-      <div class="card"><div class="ico">🔄</div><h3>آزادانه بین پرونده‌ها حرکت کنید</h3><p>در هر مرحله می‌توانید به منوی اصلی برگردید، پرونده دیگری را باز کنید یا پرونده جدید بسازید؛ پرونده قبلی محفوظ می‌ماند.</p></div>
+  <section><div class="container">
+    <div class="head"><h2>نویسه قرار است چه چیزی را از دوش شما بردارد؟</h2><p>ارزش اصلی نویسه در کاهش پراکندگی، دوباره‌کاری و فراموشی جزئیات است؛ نه در جایگزین‌کردن قضاوت تخصصی شما.</p></div>
+    <div class="value-grid">
+      <div class="value"><div class="num">01</div><h3>پایان پراکندگی اطلاعات</h3><p>صوت، تصویر، سند و یادداشت هر موضوع در همان پرونده می‌ماند؛ نه بین گالری، پیام‌رسان و پوشه‌های مختلف.</p></div>
+      <div class="value"><div class="num">02</div><h3>مرور سریع‌تر پرونده</h3><p>به‌جای مرور دوباره همه چیز، خلاصه اطلاعات، ابهام‌ها و نقاط نیازمند بررسی را یکجا ببینید.</p></div>
+      <div class="value"><div class="num">03</div><h3>کاهش دوباره‌کاری</h3><p>صوت به متن تبدیل می‌شود، اطلاعات ساختاریافته می‌شوند و برای گزارش بعدی دوباره از صفر شروع نمی‌کنید.</p></div>
+      <div class="value"><div class="num">04</div><h3>گزارش با کنترل انسانی</h3><p>پیش‌نویس گزارش را بررسی و اصلاح کنید؛ تصمیم نهایی همیشه با شما و تخصص شماست.</p></div>
+    </div>
+  </div></section>
+
+  <section id="workflow"><div class="container">
+    <div class="head center"><h2>از اولین مدرک تا گزارش نهایی، در یک مسیر روشن</h2><p>نویسه خودش را به روش کار شما تحمیل نمی‌کند؛ ابتدا پرونده را می‌سازید و فقط هر زمان که لازم بود وارد تحلیل و گزارش می‌شوید.</p></div>
+    <div class="flow">
+      <div class="flow-item"><b>۱</b><h3>پرونده بسازید</h3><p>برای هر موکل، خسارت، پروژه، بازدید یا موضوع تخصصی یک پرونده مستقل ایجاد کنید.</p></div>
+      <div class="flow-item"><b>۲</b><h3>اطلاعات را اضافه کنید</h3><p>متن، صوت، تصویر و فایل‌ها را مستقیم از بله به همان پرونده بفرستید.</p></div>
+      <div class="flow-item"><b>۳</b><h3>تحلیل و بررسی کنید</h3><p>وقتی آماده بودید، نویسه اطلاعات کلیدی و موارد مبهم یا ناقص را برای تصمیم شما نمایش می‌دهد.</p></div>
+      <div class="flow-item"><b>۴</b><h3>گزارش آماده کنید</h3><p>با اطلاعات تأییدشده، گزارش تخصصی قابل بازبینی بسازید، اصلاح کنید و خروجی Word بگیرید.</p></div>
     </div>
   </div></section>
 
   <section><div class="container split">
-    <div class="featurebox"><h2>💬 بله برای کار سریع</h2><div class="list"><div class="item"><i>➕</i><div><strong>ساخت پرونده</strong><br><span>بدون command و فقط با دکمه.</span></div></div><div class="item"><i>🎙</i><div><strong>ارسال محتوا</strong><br><span>متن، صوت، تصویر و فایل در همان پرونده ذخیره می‌شوند.</span></div></div><div class="item"><i>🧠</i><div><strong>شروع تحلیل و تصمیم‌ها</strong><br><span>نتیجه تحلیل، رفع موارد و تولید گزارش از همان گفتگو قابل کنترل است.</span></div></div><div class="item"><i>🏠</i><div><strong>همیشه راه خروج دارید</strong><br><span>منوی اصلی، پرونده جدید و پرونده‌های من در جریان‌های مهم در دسترس‌اند.</span></div></div></div></div>
-    <div class="featurebox"><h2>🌐 وب برای مرور عمیق</h2><div class="list"><div class="item"><i>📊</i><div><strong>Dashboard شخصی</strong><br><span>پرونده‌های فعال، بایگانی‌شده و موارد نیازمند اقدام در یک نما.</span></div></div><div class="item"><i>📁</i><div><strong>مخزن و دانلود امن</strong><br><span>فایل‌ها از storage خصوصی و فقط پس از بررسی مجوز کاربر ارائه می‌شوند.</span></div></div><div class="item"><i>📑</i><div><strong>بررسی و تأیید گزارش</strong><br><span>ویرایش نسخه، مرور محدودیت‌ها و دریافت DOCX نهایی.</span></div></div><div class="item"><i>💳</i><div><strong>اشتراک و مصرف</strong><br><span>پلن، محدودیت‌ها و مصرف حساب در پنل نمایش داده می‌شود؛ پرداخت آنلاین در مرحله اتصال زیبال است.</span></div></div></div></div>
+    <div class="featurebox"><h3>💬 ساده در بله</h3><p>جایی که همین حالا هر روز پیام، صوت، عکس و فایل ردوبدل می‌کنید.</p><div class="checklist"><div class="check"><i>✓</i><span>ساخت و تغییر پرونده با دکمه‌های فارسی</span></div><div class="check"><i>✓</i><span>ارسال مستقیم صوت، تصویر و مدرک</span></div><div class="check"><i>✓</i><span>مشاهده وضعیت اشتراک و خرید پلن</span></div><div class="check"><i>✓</i><span>ورود امن به پنل وب با لینک یک‌بارمصرف</span></div></div></div>
+    <div class="featurebox"><h3>🌐 دقیق در پنل وب</h3><p>برای زمانی که می‌خواهید پرونده را با تمرکز بیشتر مرور و مدیریت کنید.</p><div class="checklist"><div class="check"><i>✓</i><span>مرور مخزن کامل مدارک و صوت‌ها</span></div><div class="check"><i>✓</i><span>مشاهده نتیجه تحلیل و موارد نیازمند اقدام</span></div><div class="check"><i>✓</i><span>بررسی و اصلاح گزارش قبل از تأیید</span></div><div class="check"><i>✓</i><span>مدیریت اشتراک، مصرف و پرونده‌های قبلی</span></div></div></div>
   </div></section>
 
-  {% if show_billing_portal %}<section id="plans"><div class="container">
-    <div class="head"><h2>پلن‌ها و ظرفیت استفاده</h2><p>پلن‌ها و محدودیت‌های زیر مستقیماً از تنظیمات مدیریتی نویسه خوانده می‌شوند و ممکن است با تصمیم مدیر سامانه تغییر کنند.</p></div>
-    {% if plans %}<div class="plans">{% for plan in plans %}<div class="plan"><h3>{{ plan.name }}</h3><div class="price">{{ plan.monthly_price|floatformat:0 }} <small>{{ plan.currency }} / ماه</small></div><ul><li>تا {{ plan.max_cases_per_period }} پرونده در هر دوره</li><li>تا {{ plan.max_stt_seconds_per_period }} ثانیه تبدیل صوت به متن</li><li>تا {{ plan.max_ai_extractions_per_period }} تحلیل هوشمند</li><li>تا {{ plan.max_members }} عضو</li></ul></div>{% endfor %}</div>{% else %}<div class="card">هنوز پلن عمومی فعالی از سوی مدیر سامانه تعریف نشده است.</div>{% endif %}
-    <div class="note">💳 {{ billing_notice }} در حال حاضر هیچ دکمه پرداختی تا زمان تکمیل اتصال واقعی و امن درگاه نمایش داده نمی‌شود.</div>
-  </div></section>{% endif %}
-
-  <section><div class="container creator">
-    <div><div class="eyebrow">سازنده و پشتیبانی</div><h2 style="margin:10px 0 0">نویسه توسط {{ creator_name }} توسعه داده می‌شود</h2><p>برای آشنایی بیشتر با سازنده، پروژه‌ها و حوزه فعالیت می‌توانید به وب‌سایت شخصی مراجعه کنید. برای پشتیبانی فنی و ارتباط درباره نویسه نیز ایمیل زیر در دسترس است.</p></div>
-    <div class="support"><a class="pill" href="{{ creator_url }}" target="_blank" rel="noopener">🌐 {{ creator_url }}</a><a class="pill" href="mailto:{{ support_email }}">✉️ {{ support_email }}</a></div>
+  <section><div class="container">
+    <div class="trial">
+      <div><h2>۳۰ روز نویسه را در کار واقعی خودتان امتحان کنید</h2><p>چند پرونده واقعی بسازید، صوت و مدارک اضافه کنید، تحلیل بگیرید و ببینید آیا نویسه واقعاً زمان و تمرکز شما را برمی‌گرداند یا نه. برای شروع نیازی به پرداخت نیست.</p></div>
+      {% if bale_public_url %}<a class="btn primary" href="{{ bale_public_url }}" target="_blank" rel="noopener">شروع رایگان در بله ←</a>{% else %}<a class="btn primary" href="/guide/">مشاهده راهنمای شروع ←</a>{% endif %}
+    </div>
   </div></section>
 
-  <section><div class="container" style="text-align:center"><div class="head"><h2>برای شروع، فقط ربات را باز کنید</h2><p style="margin:auto">اگر اولین بار است از نویسه استفاده می‌کنید، راهنمای جدید قدم‌به‌قدم همه مسیرها و حالت‌ها را توضیح می‌دهد.</p></div><div class="actions" style="justify-content:center">{% if bale_public_url %}<a class="btn primary" href="{{ bale_public_url }}" target="_blank" rel="noopener">💬 شروع در بله</a>{% endif %}<a class="btn secondary" href="/guide/">📘 مطالعه راهنمای کامل</a></div></div></section>
+  {% if show_billing_portal %}
+  <section id="plans"><div class="container">
+    <div class="head center"><h2>پلنی متناسب با حجم کار شما</h2><p>با دوره آزمایشی شروع کنید و وقتی نویسه وارد جریان واقعی کارتان شد، پلن مناسب را انتخاب کنید.</p></div>
+    <div class="plans">
+      {% for plan in plans %}
+      <article class="plan {% if plan.code == 'pro' %}featured{% endif %}">{% if plan.code == 'pro' %}<span class="ribbon">پیشنهاد نویسه</span>{% endif %}<h3>{{ plan.name }}</h3><div class="price">{% if plan.monthly_price == 0 %}رایگان{% else %}{{ plan.monthly_price|floatformat:0 }} <small>ریال / ماه</small>{% endif %}</div><ul><li>{{ plan.max_cases_per_period }} پرونده در دوره</li><li>{{ plan.max_stt_seconds_per_period }} ثانیه تبدیل صوت</li><li>{{ plan.max_ai_extractions_per_period }} تحلیل هوشمند</li><li>تا {{ plan.max_members }} عضو</li></ul><div class="mini">{% if plan.code == 'trial' %}یک‌بار برای ۳۰ روز{% else %}خرید و تمدید از بله یا پنل وب{% endif %}</div></article>
+      {% empty %}
+      <article class="plan"><h3>آزمایشی ۳۰ روزه</h3><div class="price">رایگان</div><ul><li>برای تجربه واقعی نویسه</li><li>پرونده، صوت، تحلیل و گزارش</li></ul></article>
+      <article class="plan featured"><span class="ribbon">پیشنهاد نویسه</span><h3>حرفه‌ای</h3><div class="price">برای کاربران حرفه‌ای</div><ul><li>مناسب کار فردی مستمر</li><li>سهمیه بالاتر پرونده و تحلیل</li></ul></article>
+      <article class="plan"><h3>تیمی</h3><div class="price">برای تیم‌ها</div><ul><li>مناسب دفاتر و مجموعه‌ها</li><li>چند عضو و ظرفیت بیشتر</li></ul></article>
+      {% endfor %}
+    </div>
+  </div></section>
+  {% endif %}
+
+  <section><div class="container">
+    <div class="creator"><div><h3>نویسه، ساخته‌شده برای کار حرفه‌ای فارسی‌زبان</h3><p>طراحی و توسعه توسط {{ creator_name|default:'آراز شاه‌کرمی' }}؛ برای پیشنهاد، همکاری یا پشتیبانی می‌توانید مستقیم در تماس باشید.</p></div><div class="creatorlinks"><a class="pill" href="{{ creator_url|default:'https://araz.me' }}" target="_blank" rel="noopener">🌐 araz.me</a><a class="pill" href="mailto:{{ support_email|default:'mail@araz.me' }}">✉️ {{ support_email|default:'mail@araz.me' }}</a><a class="pill" href="/guide/">📘 راهنمای نویسه</a></div></div>
+  </div></section>
 </main>
-<footer><div class="container foot"><span>© نویسه — مدیریت هوشمند پرونده و گزارش</span><span>ساخته‌شده توسط <a href="{{ creator_url }}" target="_blank" rel="noopener">{{ creator_name }}</a> · پشتیبانی: <a href="mailto:{{ support_email }}">{{ support_email }}</a></span></div></footer>
+
+<footer><div class="container foot"><span>© نویسه · دستیار هوشمند پرونده‌های تخصصی</span><span>پرونده، مدرک، تحلیل و گزارش در یک جریان حرفه‌ای</span></div></footer>
 </body>
 </html>
