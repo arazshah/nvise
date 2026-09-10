@@ -14,6 +14,7 @@ from apps.system.integrations import get_bale_config
 
 from .followups import ensure_follow_up_questions, send_next_follow_up
 from .models import CaseFieldIssue, ExtractionRun, FieldSchema
+from .playbooks import serialize_playbook
 from .providers import get_extraction_provider
 from .results import analysis_result_keyboard, analysis_result_text
 from .services import apply_extraction_response, collect_case_evidence, serialize_schema
@@ -68,7 +69,7 @@ def extract_case_facts(self, run_id: str) -> None:
     with transaction.atomic():
         run = (
             ExtractionRun.objects.select_for_update()
-            .select_related("case__tenant", "schema__sub_vertical__vertical")
+            .select_related("case__tenant", "case__created_by", "schema__sub_vertical__vertical")
             .get(pk=run_id)
         )
         if run.status == ExtractionRun.Status.COMPLETED:
@@ -94,8 +95,11 @@ def extract_case_facts(self, run_id: str) -> None:
             "sub_vertical__vertical"
         ).get(pk=run.schema_id)
         evidence = collect_case_evidence(run.case)
+        playbook = serialize_playbook(run.case)
         provider = get_extraction_provider()
-        payload = provider.extract(schema=serialize_schema(schema), evidence=evidence)
+        schema_payload = serialize_schema(schema)
+        schema_payload["professional_playbook"] = playbook
+        payload = provider.extract(schema=schema_payload, evidence=evidence)
 
         with transaction.atomic():
             run = ExtractionRun.objects.select_for_update().select_related("case__tenant").get(pk=run.pk)
@@ -104,6 +108,7 @@ def extract_case_facts(self, run_id: str) -> None:
             run.input_snapshot = {
                 "schema_id": str(schema.id),
                 "schema_version": schema.version,
+                "professional_playbook": playbook,
                 "evidence_ids": [row["evidence_id"] for row in evidence],
             }
             run.save(update_fields=["provider", "model_name", "input_snapshot"])
@@ -114,7 +119,7 @@ def extract_case_facts(self, run_id: str) -> None:
                 quantity=1,
                 idempotency_key=f"ai-extraction:{run.id}",
                 case=run.case,
-                metadata={"provider": provider.key, "model": run.model_name},
+                metadata={"provider": provider.key, "model": run.model_name, "playbook": playbook["key"]},
             )
 
         refreshed_case = Case.objects.get(pk=run.case_id)
