@@ -22,6 +22,7 @@ class Migration(migrations.Migration):
                 ("description", models.TextField(blank=True)),
                 ("action_type", models.CharField(choices=[
                     ("manual", "اقدام دستی"),
+                    ("start_analysis", "شروع تحلیل"),
                     ("review_analysis", "بررسی تحلیل"),
                     ("retry_analysis", "بررسی تحلیل ناموفق"),
                     ("generate_report", "تولید گزارش"),
