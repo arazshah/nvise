@@ -12,6 +12,7 @@ class GoldenCaseAdmin(admin.ModelAdmin):
         "is_active",
         "minimum_fact_recall",
         "maximum_redundant_question_rate",
+        "minimum_expert_gap_recall",
         "minimum_grounding_ratio",
         "expert_report_score",
         "updated_at",
@@ -22,19 +23,32 @@ class GoldenCaseAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Benchmark", {"fields": ("key", "name", "case", "is_active", "notes")}),
         (
-            "Expected quality",
+            "Expected facts and questions",
             {
                 "fields": (
                     "expected_facts",
                     "no_followup_fact_keys",
-                    "minimum_fact_recall",
-                    "maximum_redundant_question_rate",
-                    "minimum_grounding_ratio",
-                    "expert_report_score",
+                    "expected_expert_judgment_fact_keys",
                 ),
-                "description": "expected_facts stores the human-verified field/value truth. no_followup_fact_keys marks facts that must never trigger a redundant question when present in the benchmark case.",
+                "description": (
+                    "expected_facts is human-verified ground truth. no_followup_fact_keys are facts that must not be asked again. "
+                    "expected_expert_judgment_fact_keys are professional gaps the planner is expected to surface."
+                ),
             },
         ),
+        (
+            "Quality gates",
+            {
+                "fields": (
+                    "minimum_fact_recall",
+                    "maximum_redundant_question_rate",
+                    "minimum_expert_gap_recall",
+                    "minimum_grounding_ratio",
+                    "expert_report_score",
+                )
+            },
+        ),
+        ("Expert report rubric", {"fields": ("report_rubric",)}),
         ("Timestamps", {"fields": ("created_at", "updated_at")}),
     )
 
@@ -48,6 +62,7 @@ class GoldenCaseEvaluationAdmin(admin.ModelAdmin):
         "fact_recall",
         "exact_fact_accuracy",
         "redundant_question_rate",
+        "expert_gap_recall",
         "claim_grounding_ratio",
         "report_quality_score",
         "created_at",
@@ -62,6 +77,7 @@ class GoldenCaseEvaluationAdmin(admin.ModelAdmin):
         "fact_recall",
         "exact_fact_accuracy",
         "redundant_question_rate",
+        "expert_gap_recall",
         "claim_grounding_ratio",
         "report_quality_score",
         "overall_score",
