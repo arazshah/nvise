@@ -26,12 +26,18 @@ def _case_for_user(user, case_code: str) -> Case:
 def _issue_reason(issue: CaseFieldIssue) -> str:
     details = issue.details or {}
     if issue.issue_type == CaseFieldIssue.IssueType.MISSING:
-        return "این مورد در متن‌ها، صوت‌ها یا مدارک پرونده پیدا نشده است."
+        return "این مورد پس از بررسی متن‌ها، صوت‌ها و مدارک پردازش‌شده پرونده پیدا نشده است."
     if issue.issue_type == CaseFieldIssue.IssueType.CONFLICT:
         values = details.get("values") or details.get("candidates") or []
         if values:
             return "مقادیر متفاوت یافت شده: " + "، ".join(str(value) for value in values[:4])
         return "برای این مورد اطلاعات متفاوت یا متناقض یافت شده است."
+    if issue.issue_type == CaseFieldIssue.IssueType.EXPERT_JUDGMENT:
+        rationale = str(details.get("rationale") or "").strip()
+        prompt = str(details.get("prompt") or "").strip()
+        if rationale and prompt:
+            return f"{rationale} — پرسش تخصصی: {prompt}"
+        return rationale or prompt or "این موضوع با شواهد پرونده به‌تنهایی قابل تعیین قطعی نیست و نیازمند نظر تخصصی شماست."
     value = details.get("value")
     if value is not None:
         return f"مقدار «{value}» با قالب مورد انتظار سازگار نیست."
