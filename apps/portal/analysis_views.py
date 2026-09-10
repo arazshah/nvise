@@ -5,7 +5,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from apps.cases.models import Case
 from apps.cases.services import CaseTransitionError, request_analysis
-from apps.intelligence.catalog import ensure_fire_loss_schema
+from apps.intelligence.catalog import ensure_schema_for_case
 from apps.intelligence.models import CaseFieldIssue
 from apps.intelligence.results import analysis_result_summary, waive_open_issues
 from apps.intelligence.services import start_extraction
@@ -17,7 +17,7 @@ from .services import user_can_review_case
 
 
 def _case_for_user(user, case_code: str) -> Case:
-    case = get_object_or_404(Case.objects.select_related("tenant"), case_code__iexact=case_code)
+    case = get_object_or_404(Case.objects.select_related("tenant", "created_by"), case_code__iexact=case_code)
     if not user_can_review_case(user=user, case=case):
         raise Http404
     return case
@@ -54,13 +54,7 @@ def analysis_overview(request, case_code: str):
         .select_related("field")
         .order_by("field__sequence", "created_at")
     )
-    issue_rows = [
-        {
-            "issue": issue,
-            "reason": _issue_reason(issue),
-        }
-        for issue in issues
-    ]
+    issue_rows = [{"issue": issue, "reason": _issue_reason(issue)} for issue in issues]
     integration = IntegrationSettings.objects.filter(pk=1).first()
     report = Report.objects.filter(case=case).select_related("current_revision").first()
     return render(
@@ -84,7 +78,7 @@ def start_analysis_view(request, case_code: str):
         case = request_analysis(case=case, actor=request.user)
     except CaseTransitionError:
         return HttpResponseBadRequest("این پرونده در وضعیت فعلی قابل تحلیل نیست.")
-    schema = ensure_fire_loss_schema()
+    schema = ensure_schema_for_case(case)
     start_extraction(case=case, schema=schema)
     return redirect("portal:analysis-overview", case_code=case.case_code)
 
