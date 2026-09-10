@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>پروفایل حرفه‌ای | نویسه</title>
+  <style>
+    :root{font-family:Vazirmatn,Tahoma,sans-serif;color:#111827;background:#f4f7fb}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1080px;margin:auto;padding:28px 18px 56px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}.top a{color:#2563eb;text-decoration:none}.hero,.card{background:#fff;border:1px solid #e5e7eb;border-radius:22px;box-shadow:0 12px 35px rgba(15,23,42,.06)}.hero{padding:28px;margin-bottom:18px;background:linear-gradient(135deg,#fff,#eef6ff)}h1{margin:0 0 10px;font-size:30px}.muted{color:#64748b;line-height:2}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{padding:22px}label{display:block;font-weight:700;margin:14px 0 7px}select,button{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #cbd5e1;font:inherit;background:#fff}button{background:#111827;color:#fff;border:0;margin-top:16px;cursor:pointer}.case{padding:14px 0;border-top:1px solid #eef2f7}.badge{display:inline-block;background:#eef2ff;color:#4338ca;border-radius:999px;padding:5px 9px;font-size:12px}.hint{background:#f8fafc;border-radius:14px;padding:13px;margin-top:12px;color:#475569;line-height:1.9}@media(max-width:760px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><strong>نویسه</strong><a href="/review/dashboard/">بازگشت به داشبورد ←</a></div>
+  <section class="hero">
+    <h1>👤 پروفایل حرفه‌ای</h1>
+    <div class="muted">نویسه بر اساس حرفه، تخصص و نوع پرونده شما نحوه خواندن مدارک، سؤال‌های تکمیلی و چارچوب تحلیل را تنظیم می‌کند. این انتخاب را هر زمان لازم باشد می‌توانید تغییر دهید.</div>
+  </section>
+  <div class="grid">
+    <section class="card">
+      <h2>۱) حرفه و تخصص شما</h2>
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="profile">
+        <label>حرفه</label>
+        <select name="profession" id="profession" required>
+          <option value="">انتخاب کنید</option>
+          {% for key,label in profession_options %}<option value="{{ key }}" {% if key == selected_profession %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <label>تخصص</label>
+        <select name="specialty" required>
+          <option value="">انتخاب کنید</option>
+          {% for item in specialties %}<option value="{{ item.key }}" {% if item.key == selected_specialty %}selected{% endif %}>{{ item.label }}</option>{% endfor %}
+        </select>
+        <button type="submit">ذخیره پروفایل حرفه‌ای</button>
+      </form>
+      <div class="hint">اگر حرفه را تغییر می‌دهید، ابتدا آن را ذخیره کنید؛ سپس تخصص‌ها و نوع پرونده‌های متناسب با همان حرفه نمایش داده می‌شوند.</div>
+    </section>
+    <section class="card">
+      <h2>۲) نوع پرونده</h2>
+      {% if selected_profession and selected_specialty %}
+        {% if cases %}
+          {% for case in cases %}
+          <div class="case">
+            <strong>{{ case.title|default:case.case_code }}</strong><br>
+            <span class="badge">{{ case.case_type_key|default:"نوع پرونده انتخاب نشده" }}</span>
+            <form method="post">{% csrf_token %}<input type="hidden" name="action" value="case_type"><input type="hidden" name="case_code" value="{{ case.case_code }}">
+              <label>نوع این پرونده</label>
+              <select name="case_type" required>
+                <option value="">انتخاب کنید</option>
+                {% for item in case_types %}<option value="{{ item.key }}" {% if item.key == case.case_type_key %}selected{% endif %}>{{ item.label }}</option>{% endfor %}
+              </select>
+              <button type="submit">ثبت نوع پرونده</button>
+            </form>
+          </div>
+          {% endfor %}
+        {% else %}<p class="muted">هنوز پرونده فعالی ندارید.</p>{% endif %}
+      {% else %}<p class="muted">ابتدا حرفه و تخصص خود را انتخاب و ذخیره کنید.</p>{% endif %}
+    </section>
+  </div>
+</div>
+</body>
+</html>
