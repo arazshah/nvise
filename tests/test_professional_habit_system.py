@@ -1,3 +1,4 @@
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -43,7 +44,7 @@ def test_due_manual_action_creates_reminder_and_due_claim():
         case=case,
         user=user,
         title="دریافت فاکتور",
-        due_at=timezone.now() - timezone.timedelta(minutes=1),
+        due_at=timezone.now() - timedelta(minutes=1),
     )
     reminder = CaseReminder.objects.get(action=action)
     assert reminder.status == CaseReminder.Status.PENDING
