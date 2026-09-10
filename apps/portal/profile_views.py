@@ -2,6 +2,9 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
+from datetime import time
+
+from apps.cases.models import ReminderPreference
 
 from apps.cases.models import Case
 from apps.intelligence.professional_catalog import (
@@ -78,3 +81,26 @@ def professional_profile(request):
             "cases": cases,
         },
     )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def reminder_preferences(request):
+    prefs, _ = ReminderPreference.objects.get_or_create(user=request.user)
+    if request.method == "POST":
+        prefs.reminders_enabled = request.POST.get("reminders_enabled") == "on"
+        prefs.due_action_enabled = request.POST.get("due_action_enabled") == "on"
+        prefs.report_review_enabled = request.POST.get("report_review_enabled") == "on"
+        prefs.stale_case_enabled = request.POST.get("stale_case_enabled") == "on"
+        prefs.daily_digest_enabled = request.POST.get("daily_digest_enabled") == "on"
+        prefs.weekly_digest_enabled = request.POST.get("weekly_digest_enabled") == "on"
+        try:
+            hs, ms = [int(v) for v in request.POST.get("quiet_start", "22:00").split(":", 1)]
+            he, me = [int(v) for v in request.POST.get("quiet_end", "08:00").split(":", 1)]
+            prefs.quiet_start = time(hs, ms)
+            prefs.quiet_end = time(he, me)
+        except (TypeError, ValueError):
+            return HttpResponseBadRequest("ساعات سکوت معتبر نیست.")
+        prefs.save()
+        return redirect("portal:reminder-preferences")
+    return render(request, "portal/reminder_preferences.html", {"prefs": prefs})
