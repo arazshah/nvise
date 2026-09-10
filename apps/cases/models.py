@@ -83,3 +83,63 @@ class CaseEvent(models.Model):
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     payload = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class CaseAction(models.Model):
+    class ActionType(models.TextChoices):
+        MANUAL = "manual", "اقدام دستی"
+        REVIEW_ANALYSIS = "review_analysis", "بررسی تحلیل"
+        RETRY_ANALYSIS = "retry_analysis", "بررسی تحلیل ناموفق"
+        GENERATE_REPORT = "generate_report", "تولید گزارش"
+        REVIEW_REPORT = "review_report", "بررسی گزارش"
+        REGENERATE_REPORT = "regenerate_report", "بازسازی گزارش"
+        FOLLOW_UP = "follow_up", "پیگیری پرونده"
+
+    class Status(models.TextChoices):
+        OPEN = "open", "باز"
+        DONE = "done", "انجام شده"
+        DISMISSED = "dismissed", "کنار گذاشته شده"
+
+    class Priority(models.IntegerChoices):
+        LOW = 10, "کم"
+        NORMAL = 20, "عادی"
+        HIGH = 30, "مهم"
+        URGENT = 40, "فوری"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    case = models.ForeignKey(Case, on_delete=models.CASCADE, related_name="actions")
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    action_type = models.CharField(max_length=32, choices=ActionType.choices, default=ActionType.MANUAL)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN, db_index=True)
+    priority = models.PositiveSmallIntegerField(choices=Priority.choices, default=Priority.NORMAL, db_index=True)
+    due_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    system_key = models.CharField(max_length=96, blank=True)
+    source_event = models.CharField(max_length=96, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_case_actions",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-priority", "due_at", "created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["case", "system_key"],
+                condition=~models.Q(system_key=""),
+                name="uniq_case_system_action",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["status", "due_at", "priority"], name="case_action_queue_idx")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.case.case_code}: {self.title}"
