@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -64,6 +65,13 @@ _SYSTEM_ACTIONS = {
         "priority": CaseAction.Priority.URGENT,
         "route_name": "portal:grounding-overview",
     },
+    "case:stale": {
+        "title": "این پرونده مدتی بدون اقدام مانده است",
+        "description": "پرونده هنوز فعال است اما بیش از یک هفته تغییری نداشته؛ بررسی کنید آیا پیگیری، تکمیل یا بایگانی لازم است.",
+        "action_type": CaseAction.ActionType.STALE_CASE,
+        "priority": CaseAction.Priority.LOW,
+        "route_name": "portal:case-repository",
+    },
 }
 
 
@@ -94,6 +102,13 @@ def _wanted_system_keys(case: Case) -> list[str]:
 
     if case.analysis_status == Case.AnalysisStatus.NOT_STARTED and case.messages.exists():
         return ["analysis:start"]
+
+    if (
+        case.report_status != Case.ReportStatus.APPROVED
+        and case.messages.exists()
+        and case.updated_at <= timezone.now() - timedelta(days=7)
+    ):
+        return ["case:stale"]
 
     return []
 
