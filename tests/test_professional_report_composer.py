@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -6,7 +7,6 @@ from apps.accounts.models import User
 from apps.cases.services import create_case
 from apps.intelligence.playbooks import resolve_playbook
 from apps.reports.composer import compose_professional_report, fallback_report
-from apps.system.models import IntegrationSettings
 from apps.tenants.models import Tenant, TenantMembership
 
 
@@ -18,11 +18,25 @@ def _case(*, profession, specialty=""):
     return case
 
 
-def _enable_avalai():
-    settings, _ = IntegrationSettings.objects.get_or_create(pk=1)
-    settings.avalai_enabled = True
-    settings.avalai_api_key = "test-key"
-    settings.save()
+def _mock_avalai(monkeypatch):
+    monkeypatch.setattr(
+        "apps.reports.composer.get_avalai_config",
+        lambda: SimpleNamespace(
+            enabled=True,
+            api_key="test-key",
+            base_url="https://api.example.test/v1",
+            text_model="test-model",
+            timeout_seconds=30,
+        ),
+    )
+
+
+def _expected_sections(playbook):
+    rows = []
+    for index, title in enumerate(playbook.report_sections):
+        key = "limitations" if "محدودیت" in title else f"section_{index + 1}"
+        rows.append({"key": key, "title": title})
+    return rows
 
 
 @pytest.mark.django_db
@@ -41,13 +55,16 @@ def test_fallback_uses_professional_playbook_sections():
 @pytest.mark.django_db
 def test_composer_accepts_only_playbook_section_keys(monkeypatch):
     case = _case(profession=User.Profession.INSURANCE_LOSS_ADJUSTER, specialty="property_fire")
-    _enable_avalai()
+    _mock_avalai(monkeypatch)
     playbook = resolve_playbook(case)
+    expected = _expected_sections(playbook)
 
     class Response:
         headers = {}
+
         def raise_for_status(self):
             return None
+
         def json(self):
             return {
                 "model": "test-model",
@@ -55,8 +72,8 @@ def test_composer_accepts_only_playbook_section_keys(monkeypatch):
                     "title": "گزارش کارشناسی",
                     "summary": "خلاصه حرفه‌ای",
                     "sections": [
-                        {"key": f"section_{i + 1}", "title": title, "content": f"متن بخش {i + 1}"}
-                        for i, title in enumerate(playbook.report_sections)
+                        {"key": item["key"], "title": item["title"], "content": f"متن بخش {index + 1}"}
+                        for index, item in enumerate(expected)
                     ],
                 }, ensure_ascii=False)}}],
             }
@@ -65,18 +82,21 @@ def test_composer_accepts_only_playbook_section_keys(monkeypatch):
     result = compose_professional_report(case=case, facts={}, limitations=[])
     assert result["composer"] == "avalai"
     assert result["model"] == "test-model"
+    assert [section["key"] for section in result["sections"]] == [item["key"] for item in expected]
     assert [section["title"] for section in result["sections"]] == list(playbook.report_sections)
 
 
 @pytest.mark.django_db
 def test_invalid_ai_structure_falls_back_safely(monkeypatch):
     case = _case(profession=User.Profession.TECHNICAL_EXPERT, specialty="industrial")
-    _enable_avalai()
+    _mock_avalai(monkeypatch)
 
     class Response:
         headers = {}
+
         def raise_for_status(self):
             return None
+
         def json(self):
             return {
                 "model": "test-model",
