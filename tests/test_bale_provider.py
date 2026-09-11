@@ -74,3 +74,29 @@ def test_one_time_keyboard_is_not_polluted_with_global_entries():
     }
 
     assert BaleProvider._with_portal_button(keyboard) == keyboard
+
+
+def test_bale_image_sent_as_document_is_normalized_as_image():
+    provider = BaleProvider()
+    payload = {
+        "update_id": 1003,
+        "message": {
+            "message_id": 79,
+            "date": 1788920002,
+            "from": {"id": 123},
+            "chat": {"id": 123},
+            "document": {
+                "file_id": "image-document-file-id",
+                "file_name": "damage.jpg",
+                "mime_type": "image/jpeg",
+                "file_size": 4096,
+            },
+        },
+    }
+
+    update = provider.parse_update(payload)
+
+    assert update.message is not None
+    assert update.message.message_type == "image"
+    assert update.message.file is not None
+    assert update.message.file.file_name == "damage.jpg"

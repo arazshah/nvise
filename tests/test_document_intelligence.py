@@ -1,8 +1,9 @@
 import fitz
 
 from apps.processing.document_intelligence import classify_document_text, extract_document_pages
+from apps.messaging.models import CaseMessage
 from apps.processing.models import ProcessingJob
-from apps.processing.tasks import _enqueue_next_job
+from apps.processing.tasks import _enqueue_next_job, _next_job_type
 
 
 def test_classifies_insurance_policy_from_document_text():
@@ -50,3 +51,14 @@ def test_document_and_image_jobs_are_dispatched(monkeypatch):
     _enqueue_next_job(image_job)
 
     assert calls == [("document", "doc-1"), ("image", "img-1")]
+
+
+def test_image_document_attachment_uses_image_analysis_job():
+    assert (
+        _next_job_type(
+            CaseMessage.MessageType.DOCUMENT,
+            mime_type="image/jpeg",
+            filename="damage.jpg",
+        )
+        == ProcessingJob.JobType.ANALYZE_IMAGE
+    )

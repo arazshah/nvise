@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from ..base import MessagingProvider
@@ -9,6 +10,9 @@ from .client import BaleClient
 
 PORTAL_LOGIN_LABEL = "🌐 ورود به پنل نویسه"
 BILLING_LABEL = "💳 اشتراک و مصرف"
+IMAGE_FILE_SUFFIXES = {
+    ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"
+}
 
 
 class BaleProvider(MessagingProvider):
@@ -53,8 +57,8 @@ class BaleProvider(MessagingProvider):
             message_type = "audio"
             file = self._parse_file(payload["audio"])
         elif payload.get("document"):
-            message_type = "document"
             file = self._parse_file(payload["document"])
+            message_type = "image" if self._is_image_file(file) else "document"
         elif payload.get("photo"):
             message_type = "image"
             photos = payload["photo"]
@@ -94,6 +98,13 @@ class BaleProvider(MessagingProvider):
             mime_type=payload.get("mime_type"),
             file_size=payload.get("file_size"),
         )
+
+    @staticmethod
+    def _is_image_file(file: NormalizedFile) -> bool:
+        mime_type = (file.mime_type or "").split(";", 1)[0].strip().lower()
+        if mime_type.startswith("image/"):
+            return True
+        return Path(file.file_name or "").suffix.lower() in IMAGE_FILE_SUFFIXES
 
     @staticmethod
     def _with_portal_button(keyboard: dict | None) -> dict | None:

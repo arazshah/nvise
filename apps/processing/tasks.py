@@ -3,6 +3,7 @@ from celery import shared_task
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from pathlib import Path
 
 from apps.evidence.services import replace_document_page_evidence, replace_image_analysis_evidence
 from apps.messaging.models import CaseMessage
@@ -19,13 +20,35 @@ from .models import CaseAttachment, ProcessingAttempt, ProcessingJob
 from .storage import read_private_bytes, store_private_bytes
 
 
-def _next_job_type(message_type: str) -> str | None:
+IMAGE_FILE_SUFFIXES = {
+    ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"
+}
+
+
+def _is_image_attachment(
+    message_type: str,
+    mime_type: str | None = None,
+    filename: str | None = None,
+) -> bool:
+    if message_type == CaseMessage.MessageType.IMAGE:
+        return True
+    normalized_mime = (mime_type or "").split(";", 1)[0].strip().lower()
+    return normalized_mime.startswith("image/") or (
+        Path(filename or "").suffix.lower() in IMAGE_FILE_SUFFIXES
+    )
+
+
+def _next_job_type(
+    message_type: str,
+    mime_type: str | None = None,
+    filename: str | None = None,
+) -> str | None:
     if message_type in {CaseMessage.MessageType.VOICE, CaseMessage.MessageType.AUDIO}:
         return ProcessingJob.JobType.TRANSCRIBE_AUDIO
+    if _is_image_attachment(message_type, mime_type, filename):
+        return ProcessingJob.JobType.ANALYZE_IMAGE
     if message_type == CaseMessage.MessageType.DOCUMENT:
         return ProcessingJob.JobType.EXTRACT_DOCUMENT
-    if message_type == CaseMessage.MessageType.IMAGE:
-        return ProcessingJob.JobType.ANALYZE_IMAGE
     return None
 
 
@@ -255,7 +278,11 @@ def fetch_attachment(self, job_id: str) -> None:
             attempt.metadata = {"bytes": len(content), "sha256": digest}
             attempt.save(update_fields=["succeeded", "finished_at", "metadata"])
 
-            next_type = _next_job_type(attachment.message.message_type)
+            next_type = _next_job_type(
+                attachment.message.message_type,
+                attachment.mime_type,
+                attachment.original_name,
+            )
             if next_type:
                 next_job, _ = ProcessingJob.objects.get_or_create(
                     attachment=attachment,
