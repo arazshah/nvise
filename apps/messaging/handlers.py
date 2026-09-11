@@ -603,12 +603,50 @@ def handle_message(*, inbound: InboundUpdate, provider, user, message) -> None:
     if _handle_follow_up_answer(state=state, inbound=inbound, provider=provider, user=user, message=message):
         return
 
-    stored = _record_message(inbound=inbound, user=user, state=state, message=message)
-    _enqueue_attachment_if_present(stored=stored, message=message)
-    if stored.assignment_status == CaseMessage.AssignmentStatus.ASSIGNED and stored.text.strip():
-        sync_message_evidence(stored)
+    stored = _record_message(
+        inbound=inbound,
+        user=user,
+        state=state,
+        message=message,
+    )
+
     if stored.assignment_status == CaseMessage.AssignmentStatus.UNASSIGNED:
-        send_text(provider, message.external_chat_id, "📭 این پیام به پرونده‌ای متصل نشد. ابتدا یک پرونده را فعال کنید یا پرونده جدید بسازید.", main_menu_keyboard())
+        send_text(
+            provider,
+            message.external_chat_id,
+            "📭 این پیام به پرونده‌ای متصل نشد. ابتدا یک پرونده را فعال کنید.",
+            main_menu_keyboard(),
+        )
         return
-    if message.file is not None:
-        send_text(provider, message.external_chat_id, f"📎 فایل داخل پرونده «{stored.case.title or stored.case.case_code}» ذخیره شد و برای پردازش در صف قرار گرفت.", active_case_keyboard(stored.case))
+
+    if stored.text.strip():
+        sync_message_evidence(stored)
+
+    if message.file is not None and message.file.file_id:
+        _enqueue_attachment_if_present(stored=stored, message=message)
+        send_text(
+            provider,
+            message.external_chat_id,
+            f"✅ مدرک داخل پرونده «{stored.case.title or stored.case.case_code}» ذخیره شد "
+            "و برای پردازش در صف قرار گرفت.\n\n"
+            "پس از پایان پردازش، دکمه «🧠 تحلیل پرونده» را بزنید.",
+            active_case_keyboard(stored.case),
+        )
+        return
+
+    if stored.text.strip():
+        send_text(
+            provider,
+            message.external_chat_id,
+            f"✅ اطلاعات متنی داخل پرونده «{stored.case.title or stored.case.case_code}» ذخیره شد.\n\n"
+            "برای بررسی اطلاعات جدید، دکمه «🧠 تحلیل پرونده» را بزنید.",
+            active_case_keyboard(stored.case),
+        )
+        return
+
+    send_text(
+        provider,
+        message.external_chat_id,
+        "✅ اطلاعات شما دریافت شد و داخل پرونده ذخیره گردید.",
+        active_case_keyboard(stored.case),
+    )
