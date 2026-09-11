@@ -290,7 +290,7 @@ def subscription_snapshot(tenant: Tenant) -> dict:
             or Decimal("0")
         )
         metrics[metric] = {
-            "used": str(Decimal(used)),
+            "used": f"{Decimal(used):.3f}",
             "limit": str(Decimal(str(getattr(subscription.plan, field)))),
         }
     return {
